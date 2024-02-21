@@ -60,20 +60,26 @@ def SVFRRP_model(sets, params):
     eac = 1.05
     emission_factor = 1.08
     probability = params['Probability']  # P_w
+    not_retrofit_to_system = [1]
 
+
+    # Indices for variables
+    indices_retro = [(s, s2, a, t) for s in S for s2 in S2 if (s2 not in not_retrofit_to_system and s2 != s) for a in A for t in T1]  
+    indices_scrap_1 = [(s, a, t) for s in S for a in A if (a!=0) for t in T1] 
+    indices_scrap_2 = [(s, a, t, w) for s in S for a in A if (a!=0) for t in T2 for w in O]
 
     # Variables
-    psv1_s_a_t = model.addVars(S, A, T1, vtype=gp.GRB.INTEGER, lb=0, name="xsat1")                                   # x
-    retro_psv1_s_s_a_t = model.addVars(S, S2, A, T1, vtype=gp.GRB.INTEGER, lb=0, name="retro_psv1_s_s_a_t")              # y^r
+    psv1_s_a_t = model.addVars(S, A, T1, vtype=gp.GRB.INTEGER, lb=0, name="xsat1")    # x                      
+    retro_psv1_s_s_a_t = model.addVars(indices_retro, vtype=gp.GRB.INTEGER, lb=0, name="retro_psv1_s_s_a_t")              # y^r
     new_psv1_s_t = model.addVars(S, T1, vtype=gp.GRB.INTEGER, lb=0, name="new_psv1_s_t")                            # y^N
-    scrap_psv1_s_a_t = model.addVars(S, A, T1, vtype=gp.GRB.INTEGER, lb=0, name="scrap_psv1_s_a_t")                   # y^S
+    scrap_psv1_s_a_t = model.addVars(indices_scrap_1, vtype=gp.GRB.INTEGER, lb=0, name="scrap_psv1_s_a_t")                   # y^S
     weekly_routes1_s_a_f_r_t = model.addVars(S, A,F_s, R_s, T1, vtype=gp.GRB.INTEGER, name="weekly_routes1_s_a_f_r_t")            #z^T
 
     # stage 2 variables
     psv2_s_a_t_w = model.addVars(S, A, T2, O, vtype=gp.GRB.INTEGER, lb=0, name="xsat2")                                   # x
-    retro_psv2_s_s_a_t_w = model.addVars(S, S2, A, T2, O, vtype=gp.GRB.INTEGER, lb=0, name="retro_psv2_s_s_a_t_w")              # y^r
+    retro_psv2_s_s_a_t_w = model.addVars(indices_retro, vtype=gp.GRB.INTEGER, lb=0, name="retro_psv2_s_s_a_t_w")              # y^r
     new_psv2_s_t_w = model.addVars(S, T2, O, vtype=gp.GRB.INTEGER, lb=0, name="new_psv2_s_t_w")                            # y^N
-    scrap_psv2_s_a_t_w = model.addVars(S, A, T2, O, vtype=gp.GRB.INTEGER, lb=0, name="scrap_psv2_s_a_t_w")                   # y^S
+    scrap_psv2_s_a_t_w = model.addVars(indices_scrap_2, vtype=gp.GRB.INTEGER, lb=0, name="scrap_psv2_s_a_t_w")                   # y^S
     weekly_routes2_s_a_f_r_t_w = model.addVars(S, A,F_s, R_s, T2, O, vtype=gp.GRB.INTEGER, name="weekly_routes2_s_a_f_r_t_w")            #z^T
 
 
@@ -84,11 +90,12 @@ def SVFRRP_model(sets, params):
 
     total_cost_per_t_s1 = {
         t: gp.quicksum(
-            retro_cost[s, s1, t] * retro_psv1_s_s_a_t[s, s1, a, t]/eac**(t-1) for s in S for s1 in S for a in A
+            retro_cost[s, s1, t] * retro_psv1_s_s_a_t[s, s1, a, t]/eac**(t-1)
+            for s in S for a in A for s1 in S if (s, s1, a, t) in retro_psv1_s_s_a_t
         ) + gp.quicksum(
             aquiring_cost[s, t] * new_psv1_s_t[s, t]/eac**(t-1) for s in S
         ) - gp.quicksum(
-            selling_revenue[s, a, t] * scrap_psv1_s_a_t[s, a, t]/eac**(t-1) for s in S for a in A
+            selling_revenue[s, a, t] * scrap_psv1_s_a_t[s, a, t]/eac**(t-1) for s in S for a in A if (s,a,t) in scrap_psv1_s_a_t
         ) + gp.quicksum(
             (fuel_cost1[f, r] * 0.4 if t == 1 else fuel_cost1[f, r])/eac**(t-1) * weekly_routes1_s_a_f_r_t[s,a,f,r,t] * week_to_t
             for s in S for a in A for f in F_s for r in R_s
@@ -97,17 +104,20 @@ def SVFRRP_model(sets, params):
 
     total_cost_per_t_s2 = {
         (t, w): (probability[w] * (gp.quicksum(
-                    retro_cost[s, s1, t] * retro_psv2_s_s_a_t_w[s, s1, a, t, w] / eac**(t-1) for s in S for s1 in S for a in A
+                    retro_cost[s, s1, t] * retro_psv2_s_s_a_t_w[s, s1, a, t, w] / eac**(t-1)
+                    for s in S for a in A for s1 in S if (s, s1, a, t, w) in retro_psv2_s_s_a_t_w
                 ) + gp.quicksum(
                     aquiring_cost[s, t] * new_psv2_s_t_w[s, t, w] / eac**(t-1) for s in S
                 ) - gp.quicksum(
-                    selling_revenue[s, a, t] * scrap_psv2_s_a_t_w[s, a, t, w] / eac**(t-1) for s in S for a in A
+                    selling_revenue[s, a, t] * scrap_psv2_s_a_t_w[s, a, t, w] / eac**(t-1)
+                    for s in S for a in A if (s,a,t,w) in scrap_psv2_s_a_t_w
                 ) + gp.quicksum(
                     (fuel_cost2[f, r, w] * 0.4 if t == 1 else fuel_cost2[f, r, w]) / eac**(t-1) * weekly_routes2_s_a_f_r_t_w[s,a,f,r,t, w] * week_to_t
                     for s in S for a in A for f in F_s for r in R_s
                 ))
         ) for t in T2 for w in O
-}
+    }
+
 
 
     total_cost = gp.quicksum(total_cost_per_t_s1[t] for t in T1) + gp.quicksum(total_cost_per_t_s2[t,w] for t in T2 for w in O)
@@ -147,11 +157,16 @@ def SVFRRP_model(sets, params):
         for a in A:    
             retrofitted_psvs_from = gp.LinExpr()
             retrofitted_psvs_to = gp.LinExpr()
+            scrap_psv = gp.LinExpr()
             for s1 in S:
-                retrofitted_psvs_from.add(retro_psv1_s_s_a_t[s, s1, a, t])  # Sum of psv retrofitted from type s
-                retrofitted_psvs_to.add(retro_psv1_s_s_a_t[s1, s, a, t])  # Sum of psv retrofitted to type s
+                if (s, s1, a, t) in retro_psv1_s_s_a_t:
+                    retrofitted_psvs_from.add(retro_psv1_s_s_a_t[s, s1, a, t])  # Sum of psv retrofitted from type s
+                if (s1, s, a, t) in retro_psv1_s_s_a_t:
+                    retrofitted_psvs_to.add(retro_psv1_s_s_a_t[s1, s, a, t])  # Sum of psv retrofitted to type s
+            if (s,a,t) in scrap_psv1_s_a_t:
+                scrap_psv.add(scrap_psv1_s_a_t[s, a, t])
             model.addConstr(
-                initial_fleet_s_a[s, a] - scrap_psv1_s_a_t[s, a, t] - retrofitted_psvs_from + retrofitted_psvs_to == psv1_s_a_t[s, a, t],
+                initial_fleet_s_a[s, a] - scrap_psv - retrofitted_psvs_from + retrofitted_psvs_to == psv1_s_a_t[s, a, t],
                 name=f'initFleetBal_const_s1_{s}_{a}'
             )
     model.update()
@@ -180,8 +195,11 @@ def SVFRRP_model(sets, params):
     for s in S:
         for t in sorted(T1)[1:]:
             a = 0
+            scrap_psv = gp.LinExpr()
+            if (s,a,t) in scrap_psv1_s_a_t:
+                scrap_psv = scrap_psv1_s_a_t[s,a,t]
             model.addConstr(
-                scrap_psv1_s_a_t[s, a, t] <= new_psv1_s_t[s,t-1],
+                scrap_psv <= new_psv1_s_t[s,t-1],
                 name = f'psv_sell_s1_{s}_{t}'
             )
     model.update()
@@ -194,10 +212,14 @@ def SVFRRP_model(sets, params):
             t = 0
             retrofitted_psvs_from = gp.LinExpr()
             for s2 in S:
-                retrofitted_psvs_from.add(retro_psv1_s_s_a_t[s, s2, a, t])  # Sum of psv retrofitted from type s
+                if (s, s2, a, t) in retro_psv1_s_s_a_t:
+                    retrofitted_psvs_from.add(retro_psv1_s_s_a_t[s, s2, a, t])  # Sum of psv retrofitted from type s
+            scrap_psv = gp.LinExpr()
+            if (s,a,t) in scrap_psv1_s_a_t:
+                scrap_psv = scrap_psv1_s_a_t[s,a,t]    
                 # print('scrap', retrofitted_psvs_from)
             model.addConstr(
-                retrofitted_psvs_from + scrap_psv1_s_a_t[s, a, t] <= initial_fleet_s_a[s, a],
+                retrofitted_psvs_from + scrap_psv <= initial_fleet_s_a[s, a],
                 name=f'init_retrosale_bal_const_s1_{s}_{a}'
             )
     model.update()
@@ -211,9 +233,11 @@ def SVFRRP_model(sets, params):
             for t in sorted(T1)[1:]:
                 retrofitted_psvs_from = gp.LinExpr()
                 retrofitted_psvs_to = gp.LinExpr()
-                for s2 in S:
-                    retrofitted_psvs_from.add(retro_psv1_s_s_a_t[s, s2, a, t])  # Sum of psv retrofitted from type s
-                    retrofitted_psvs_to.add(retro_psv1_s_s_a_t[s2, s, a, t])  # Sum of psv retrofitted to type s
+                for s1 in S:
+                    if (s, s1, a, t) in retro_psv1_s_s_a_t:
+                        retrofitted_psvs_from.add(retro_psv1_s_s_a_t[s, s1, a, t])  # Sum of psv retrofitted from type s
+                    if (s1, s, a, t) in retro_psv1_s_s_a_t:
+                        retrofitted_psvs_to.add(retro_psv1_s_s_a_t[s1, s, a, t])  # Sum of psv retrofitted to type s
                 model.addConstr(
                     psv1_s_a_t[s, a-1, t-1] - scrap_psv1_s_a_t[s, a, t] - retrofitted_psvs_from + retrofitted_psvs_to == psv1_s_a_t[s, a, t],
                     name=f'psv_age_bal_const_s1_{s}_{a}_{t}'
@@ -225,11 +249,16 @@ def SVFRRP_model(sets, params):
             a = 0
             retrofitted_psvs_from = gp.LinExpr()
             retrofitted_psvs_to = gp.LinExpr()
-            for s2 in S:
-                retrofitted_psvs_from.add(retro_psv1_s_s_a_t[s, s2, a, t])  # Sum of psv retrofitted from type s
-                retrofitted_psvs_to.add(retro_psv1_s_s_a_t[s2, s, a, t])  # Sum of psv retrofitted to type s
+            scrap_psv = gp.LinExpr()
+            if (s,a,t) in scrap_psv1_s_a_t:
+                scrap_psv = scrap_psv1_s_a_t[s,a,t]
+            for s1 in S:
+                if (s, s1, a, t) in retro_psv1_s_s_a_t:
+                    retrofitted_psvs_from.add(retro_psv1_s_s_a_t[s, s1, a, t])  # Sum of psv retrofitted from type s
+                if (s1, s, a, t) in retro_psv1_s_s_a_t:
+                    retrofitted_psvs_to.add(retro_psv1_s_s_a_t[s1, s, a, t])  # Sum of psv retrofitted to type sed_psvs_to.add(retro_psv1_s_s_a_t[s2, s, a, t],0)  # Sum of psv retrofitted to type s
             model.addConstr(
-                new_psv1_s_t[s,t-1] - scrap_psv1_s_a_t[s, a, t] - retrofitted_psvs_from + retrofitted_psvs_to == psv1_s_a_t[s, a, t], 
+                new_psv1_s_t[s,t-1] - scrap_psv - retrofitted_psvs_from + retrofitted_psvs_to == psv1_s_a_t[s, a, t], 
                 name=f'psv_age_bal_const2_s1_{s}_{a}_{t}'
             )
 
@@ -241,7 +270,8 @@ def SVFRRP_model(sets, params):
             for t in sorted(T1)[1:]:
                 retrofitted_psvs_from = gp.LinExpr()
                 for s2 in S:
-                    retrofitted_psvs_from.add(retro_psv1_s_s_a_t[s, s2, a, t])  # Sum of psv retrofitted from type s
+                    if (s, s2, a, t) in retro_psv1_s_s_a_t:
+                        retrofitted_psvs_from.add(retro_psv1_s_s_a_t[s, s2, a, t])  # Sum of psv retrofitted from type s
                 model.addConstr(
                     retrofitted_psvs_from + scrap_psv1_s_a_t[s, a, t] <= psv1_s_a_t[s, a-1, t-1],
                     name=f'retrosale_fleet_bal_const_s1_{s}_{a}_{t}'
@@ -331,16 +361,19 @@ def SVFRRP_model(sets, params):
     for w in O:   
         for s in S:
             for a in sorted(A)[1:]:
-                t=2
+                t = 2
                 retrofitted_psvs_from = gp.LinExpr()
                 retrofitted_psvs_to = gp.LinExpr()
                 for s2 in S:
-                    retrofitted_psvs_from.add(retro_psv2_s_s_a_t_w[s, s2, a, t, w])  # Sum of psv retrofitted from type s
-                    retrofitted_psvs_to.add(retro_psv2_s_s_a_t_w[s2, s, a, t, w])  # Sum of psv retrofitted to type s
+                    if (s, s2, a, t, w) in retro_psv2_s_s_a_t_w:
+                        retrofitted_psvs_from.add(retro_psv2_s_s_a_t_w[s, s2, a, t, w])  # Sum of psv retrofitted from type s
+                    if (s2, s, a, t, w) in retro_psv2_s_s_a_t_w:
+                        retrofitted_psvs_to.add(retro_psv2_s_s_a_t_w[s2, s, a, t, w])  # Sum of psv retrofitted to type s
                 model.addConstr(
-                    psv1_s_a_t[s, a-1, t-1] - scrap_psv2_s_a_t_w[s, a, t, w] - retrofitted_psvs_from + retrofitted_psvs_to == psv2_s_a_t_w[s, a, t, w],
-                    name=f'psv_age_bal_const_na_{s}_{a}_{t}'
+                    psv1_s_a_t[s, a-1, t-1] - scrap_psv2_s_a_t_w[s, a, t, w] - retrofitted_psvs_from + retrofitted_psvs_to == psv2_s_a_t_w.get((s, a, t, w), 0),
+                    name=f'psv_age_bal_const_na_{s}_{a}_{t}_{w}'
                 )
+
         
     #5.14
     for w in O:       
@@ -350,10 +383,15 @@ def SVFRRP_model(sets, params):
             retrofitted_psvs_from = gp.LinExpr()
             retrofitted_psvs_to = gp.LinExpr()
             for s2 in S:
-                retrofitted_psvs_from.add(retro_psv2_s_s_a_t_w[s, s2, a, t, w])  # Sum of psv retrofitted from type s
-                retrofitted_psvs_to.add(retro_psv2_s_s_a_t_w[s2, s, a, t, w])  # Sum of psv retrofitted to type s
+                    if (s, s2, a, t, w) in retro_psv2_s_s_a_t_w:
+                        retrofitted_psvs_from.add(retro_psv2_s_s_a_t_w[s, s2, a, t, w])  # Sum of psv retrofitted from type s
+                    if (s2, s, a, t, w) in retro_psv2_s_s_a_t_w:
+                        retrofitted_psvs_to.add(retro_psv2_s_s_a_t_w[s2, s, a, t, w])  # Sum of psv retrofitted to type s
+            scrap_psv = gp.LinExpr()
+            if (s,a,t,w) in scrap_psv2_s_a_t_w:
+                scrap_psv = scrap_psv2_s_a_t_w[s,a,t,w]
             model.addConstr(
-                new_psv1_s_t[s,t-1] - scrap_psv2_s_a_t_w[s, a, t, w] - retrofitted_psvs_from + retrofitted_psvs_to == psv2_s_a_t_w[s, a, t, w], 
+                new_psv1_s_t[s,t-1] - scrap_psv - retrofitted_psvs_from + retrofitted_psvs_to == psv2_s_a_t_w[s, a, t, w], 
                 name=f'psv_age_bal_const2_na_{s}_{a}_{t}'
             )
 
@@ -364,9 +402,14 @@ def SVFRRP_model(sets, params):
                 t = 2
                 retrofitted_psvs_from = gp.LinExpr()
                 for s2 in S:
-                    retrofitted_psvs_from.add(retro_psv2_s_s_a_t_w[s, s2, a, t, w])  # Sum of psv retrofitted from type s
+                    if (s, s2, a, t, w) in retro_psv2_s_s_a_t_w:
+                        retrofitted_psvs_from.add(retro_psv2_s_s_a_t_w[s, s2, a, t, w])  # Sum of psv retrofitted from type s
+                scrap_psv = gp.LinExpr()
+                if (s,a,t,w) in scrap_psv2_s_a_t_w:
+                    scrap_psv = scrap_psv2_s_a_t_w[s,a,t,w]
+
                 model.addConstr(
-                    retrofitted_psvs_from + scrap_psv2_s_a_t_w[s, a, t, w] <= psv1_s_a_t[s, a-1, t-1],
+                    retrofitted_psvs_from + scrap_psv <= psv1_s_a_t[s, a-1, t-1],
                     name=f'retrosale_fleet_bal_const_na_{s}_{a}_{t}_{w}'
                 )
                 
@@ -386,8 +429,11 @@ def SVFRRP_model(sets, params):
         for s in S:
             t =2
             a = scrapping_age
+            scrap_psv = gp.LinExpr()
+            if (s,a,t,w) in scrap_psv2_s_a_t_w:
+                scrap_psv = scrap_psv2_s_a_t_w[s,a,t,w]
             model.addConstr(
-                scrap_psv2_s_a_t_w[s, a, t, w] == psv1_s_a_t[s, a-1, t-1],
+                scrap_psv == psv1_s_a_t[s, a-1, t-1],
                 name = f'psv_scrapped_period_balance_const_na_{s}_{t}_{w}'
             )
 
@@ -439,8 +485,11 @@ def SVFRRP_model(sets, params):
         for s in S:
             for t in sorted(T2)[1:]:
                 a = 0
+                scrap_psv = gp.LinExpr()
+                if (s,a,t,w) in scrap_psv2_s_a_t_w:
+                    scrap_psv = scrap_psv2_s_a_t_w[s,a,t,w]
                 model.addConstr(
-                    scrap_psv2_s_a_t_w[s, a, t, w] <= new_psv2_s_t_w[s,t-1, w],
+                    scrap_psv <= new_psv2_s_t_w[s,t-1, w],
                     name = f'psv_sell_s2_{s}_{t}_{w}'
                 )
     model.update()
@@ -456,12 +505,18 @@ def SVFRRP_model(sets, params):
                     retrofitted_psvs_from = gp.LinExpr()
                     retrofitted_psvs_to = gp.LinExpr()
                     for s2 in S:
-                        retrofitted_psvs_from.add(retro_psv2_s_s_a_t_w[s, s2, a, t, w])  # Sum of psv retrofitted from type s
-                        retrofitted_psvs_to.add(retro_psv2_s_s_a_t_w[s2, s, a, t, w])  # Sum of psv retrofitted to type s
+                        if (s, s2, a, t, w) in retro_psv2_s_s_a_t_w:
+                            retrofitted_psvs_from.add(retro_psv2_s_s_a_t_w[s, s2, a, t, w])  # Sum of psv retrofitted from type s
+                        if (s2, s, a, t, w) in retro_psv2_s_s_a_t_w:
+                            retrofitted_psvs_to.add(retro_psv2_s_s_a_t_w[s2, s, a, t, w])  # Sum of psv retrofitted to type s
+                    scrap_psv = gp.LinExpr()
+                    if (s,a,t,w) in scrap_psv2_s_a_t_w:
+                        scrap_psv = scrap_psv2_s_a_t_w[s,a,t,w]
                     model.addConstr(
-                        psv2_s_a_t_w[s, a-1, t-1, w] - scrap_psv2_s_a_t_w[s, a, t, w] - retrofitted_psvs_from + retrofitted_psvs_to == psv2_s_a_t_w[s, a, t, w],
+                        psv2_s_a_t_w[s, a-1, t-1, w] - scrap_psv - retrofitted_psvs_from + retrofitted_psvs_to == psv2_s_a_t_w[s, a, t, w],
                         name=f'psv_age_bal_const_s2_{s}_{a}_{t}_{w}'
                     )
+                 
     
     #Constraint 19
     for w in O:               
@@ -471,10 +526,15 @@ def SVFRRP_model(sets, params):
                 retrofitted_psvs_from = gp.LinExpr()
                 retrofitted_psvs_to = gp.LinExpr()
                 for s2 in S:
-                    retrofitted_psvs_from.add(retro_psv2_s_s_a_t_w[s, s2, a, t, w])  # Sum of psv retrofitted from type s
-                    retrofitted_psvs_to.add(retro_psv2_s_s_a_t_w[s2, s, a, t, w])  # Sum of psv retrofitted to type s
+                        if (s, s2, a, t, w) in retro_psv2_s_s_a_t_w:
+                            retrofitted_psvs_from.add(retro_psv2_s_s_a_t_w[s, s2, a, t, w])  # Sum of psv retrofitted from type s
+                        if (s2, s, a, t, w) in retro_psv2_s_s_a_t_w:
+                            retrofitted_psvs_to.add(retro_psv2_s_s_a_t_w[s2, s, a, t, w])  # Sum of psv retrofitted to type s
+                scrap_psv = gp.LinExpr()
+                if (s,a,t,w) in scrap_psv2_s_a_t_w:
+                    scrap_psv = scrap_psv2_s_a_t_w[s,a,t,w]
                 model.addConstr(
-                    new_psv2_s_t_w[s,t-1, w] - scrap_psv2_s_a_t_w[s, a, t, w] - retrofitted_psvs_from + retrofitted_psvs_to == psv2_s_a_t_w[s, a, t, w], 
+                    new_psv2_s_t_w[s,t-1, w] - scrap_psv - retrofitted_psvs_from + retrofitted_psvs_to == psv2_s_a_t_w[s, a, t, w], 
                     name=f'psv_age_bal_const2_s2_{s}_{a}_{t}_{w}'
                 )
 
@@ -486,9 +546,13 @@ def SVFRRP_model(sets, params):
                 for t in sorted(T2)[1:]:
                     retrofitted_psvs_from = gp.LinExpr()
                     for s2 in S:
-                        retrofitted_psvs_from.add(retro_psv2_s_s_a_t_w[s, s2, a, t, w])  # Sum of psv retrofitted from type s
+                        if (s, s2, a, t, w):
+                            retrofitted_psvs_from.add(retro_psv2_s_s_a_t_w[s, s2, a, t, w], 0)  # Sum of psv retrofitted from type s
+                    scrap_psv = gp.LinExpr()
+                    if (s,a,t,w) in scrap_psv2_s_a_t_w:
+                        scrap_psv = scrap_psv2_s_a_t_w[s,a,t,w]
                     model.addConstr(
-                        retrofitted_psvs_from + scrap_psv2_s_a_t_w[s, a, t, w] <= psv2_s_a_t_w[s, a-1, t-1, w],
+                        retrofitted_psvs_from + scrap_psv <= psv2_s_a_t_w[s, a-1, t-1, w],
                         name=f'retrosale_fleet_bal_const_s2_{s}_{a}_{t}_{w}'
                     )
                     
@@ -510,8 +574,11 @@ def SVFRRP_model(sets, params):
         for s in S:
             for t in sorted(T2)[1:]:
                 a = scrapping_age
+                scrap_psv = gp.LinExpr()
+                if (s,a,t,w) in scrap_psv2_s_a_t_w:
+                    scrap_psv = scrap_psv2_s_a_t_w[s,a,t,w]
                 model.addConstr(
-                    scrap_psv2_s_a_t_w[s, a, t, w] == psv2_s_a_t_w[s, a-1, t-1, w],
+                    scrap_psv == psv2_s_a_t_w[s, a-1, t-1, w],
                     name = f'psv_scrapped_period_balance_const_s2_{s}_{t}_{w}'
                 )
 
