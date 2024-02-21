@@ -8,8 +8,8 @@ sheet_dictionaries = {}
 
 def get_parameters(filename):
 
-    sheet_names = {'Cost of retrofitting', 'Cost of newbuilding', 'Cost of fuel', 'Time used',
-                    'Revenue', 'Demand', 'Compatibility rs', 'Installations in route', 'Max Emissions', 'Initial fleet', 'Emissions', 'Compatibility fs'}
+    sheet_names = {'Cost of retrofitting', 'Cost of newbuilding', 'Cost of fuel 1', 'Cost of fuel 2','Time used',
+                    'Revenue', 'Demand', 'Compatibility rs', 'Installations in route', 'Max Emissions', 'Initial fleet', 'Emissions', 'Compatibility fs', 'Probability'}
     sheet_dictionaries = {}
 
     for sheet in sheet_names:
@@ -82,13 +82,13 @@ def compare_dictionaries(dict1, dict2):
 # Assuming the result from your get_parameters function is stored in a variable named parameters
 
 # compare_dictionaries(parameters, testparams)
-# parameters = get_parameters(file_path)
+parameters = get_parameters(file_path)
 
-# print(parameters)
+print(parameters)
 
 def get_sets(filename):
     sheet_names = {'Power systems', 'Ages', 'Routes',
-                   'Time periods', 'Installations', 'Fuel types'}
+                   'Time periods 1', 'Time periods 2', 'Installations', 'Fuel types', 'Scenarios'}
     sheet_dictionaries = {}
 
     for sheet in sheet_names:
@@ -104,6 +104,6 @@ def get_sets(filename):
     
     return sheet_dictionaries
 
-setssheet = 'run_model/SetData-sheets.xlsx'
+setssheet = 'SetData-sheets.xlsx'
 
-# print(get_sets(setssheet))
+print(get_sets(setssheet))
