@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 import math
 
-file_path = 'Parameterdata-sheets.xlsx'
+file_path = 'data_generation/Parameterdata-sheets.xlsx'
+setssheet = 'data_generation/SetData-sheets.xlsx'
 sheet_dictionaries = {}
 
 
@@ -104,6 +105,5 @@ def get_sets(filename):
     
     return sheet_dictionaries
 
-setssheet = 'SetData-sheets.xlsx'
 
 print(get_sets(setssheet))
