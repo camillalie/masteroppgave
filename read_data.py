@@ -106,4 +106,4 @@ def get_sets(filename):
     return sheet_dictionaries
 
 
-print(get_sets(setssheet))
+# print(get_sets(setssheet))
