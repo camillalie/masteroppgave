@@ -6,13 +6,14 @@ import sys
 import numpy as np
 
 # Get parameter values
-file_parameters = 'data_generation/Parameterdata-sheets.xlsx'
+# file_parameters = 'data_generation/Parameterdata-sheets.xlsx'
+file_parameters = 'Parameterdata-sheets-1w.xlsx'
 parameters = get_parameters(file_parameters)
 print(parameters)
 
 print('Parameter values loaded')
 # Get set values
-file_sets = "data_generation/SetData-sheets.xlsx"
+file_sets = 'SetData-sheets-1w.xlsx' # "data_generation/SetData-sheets.xlsx"
 sets = get_sets(file_sets)
 print('Sets values loaded')
 
@@ -60,27 +61,31 @@ def SVFRRP_model(sets, params):
     eac = 1.05
     emission_factor = 1.08
     probability = params['Probability']  # P_w
-    not_retrofit_to_system = [1]
+    not_buy_new = [9, 10]
+    
 
 
     # Indices for variables
-    indices_retro = [(s, s2, a, t) for s in S for s2 in S2 if (s2 not in not_retrofit_to_system and s2 != s) for a in A for t in T1]  
-    indices_retro2 = [(s, s2, a, t) for s in S for s2 in S2 if (s2 not in not_retrofit_to_system and s2 != s) for a in A 
-                      for idx, t in enumerate(T2) if idx < len(T2) - 1]
+    indices_retro = [(1, 9, a, t) for a in A for t in T1] + [(2, 10, a, t) for a in A for t in T1]  
+    indices_retro2 = [(1, 9, a, t) for a in A 
+                      for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(2, 10, a, t) for a in A 
+                                                                           for idx, t in enumerate(T2) if idx < len(T2) - 1]
     indices_scrap_1 = [(s, a, t) for s in S for a in A if (a!=0) for t in T1] 
     indices_scrap_2 = [(s, a, t, w) for s in S for a in A if (a!=0) for t in T2 for w in O]
+    indices_newpsv_1 = [(s, t) for s in S if (s not in not_buy_new) for t in T1]
+    indices_newpsv_2 = [(s, t, w) for s in S if (s not in not_buy_new) for t in T2 for w in O]
 
     # Variables
     psv1_s_a_t = model.addVars(S, A, T1, vtype=gp.GRB.INTEGER, lb=0, name="xsat1")    # x                      
     retro_psv1_s_s_a_t = model.addVars(indices_retro, vtype=gp.GRB.INTEGER, lb=0, name="retro_psv1_s_s_a_t")              # y^r
-    new_psv1_s_t = model.addVars(S, T1, vtype=gp.GRB.INTEGER, lb=0, name="new_psv1_s_t")                            # y^N
+    new_psv1_s_t = model.addVars(indices_newpsv_1, vtype=gp.GRB.INTEGER, lb=0, name="new_psv1_s_t")                            # y^N
     scrap_psv1_s_a_t = model.addVars(indices_scrap_1, vtype=gp.GRB.INTEGER, lb=0, name="scrap_psv1_s_a_t")                   # y^S
     weekly_routes1_s_a_f_r_t = model.addVars(S, A,F_s, R_s, T1, vtype=gp.GRB.INTEGER, name="weekly_routes1_s_a_f_r_t")            #z^T
 
     # stage 2 variables
     psv2_s_a_t_w = model.addVars(S, A, T2, O, vtype=gp.GRB.INTEGER, lb=0, name="xsat2")                                   # x
     retro_psv2_s_s_a_t_w = model.addVars(indices_retro, vtype=gp.GRB.INTEGER, lb=0, name="retro_psv2_s_s_a_t_w")              # y^r
-    new_psv2_s_t_w = model.addVars(S, T2, O, vtype=gp.GRB.INTEGER, lb=0, name="new_psv2_s_t_w")                            # y^N
+    new_psv2_s_t_w = model.addVars(indices_newpsv_2, vtype=gp.GRB.INTEGER, lb=0, name="new_psv2_s_t_w")                            # y^N
     scrap_psv2_s_a_t_w = model.addVars(indices_scrap_2, vtype=gp.GRB.INTEGER, lb=0, name="scrap_psv2_s_a_t_w")                   # y^S
     weekly_routes2_s_a_f_r_t_w = model.addVars(S, A,F_s, R_s, T2, O, vtype=gp.GRB.INTEGER, name="weekly_routes2_s_a_f_r_t_w")            #z^T
 
@@ -95,7 +100,7 @@ def SVFRRP_model(sets, params):
             retro_cost[s, s1, t] * retro_psv1_s_s_a_t[s, s1, a, t]/eac**(t-1)
             for s in S for a in A for s1 in S if (s, s1, a, t) in retro_psv1_s_s_a_t
         ) + gp.quicksum(
-            aquiring_cost[s, t] * new_psv1_s_t[s, t]/eac**(t-1) for s in S
+            aquiring_cost[s, t] * new_psv1_s_t[s, t]/eac**(t-1) for s in S if (s,t) in new_psv1_s_t
         ) - gp.quicksum(
             selling_revenue[s, a, t] * scrap_psv1_s_a_t[s, a, t]/eac**(t-1) for s in S for a in A if (s,a,t) in scrap_psv1_s_a_t
         ) + gp.quicksum(
@@ -109,7 +114,7 @@ def SVFRRP_model(sets, params):
                     retro_cost[s, s1, t] * retro_psv2_s_s_a_t_w[s, s1, a, t, w] / eac**(t-1)
                     for s in S for a in A for s1 in S if (s, s1, a, t, w) in retro_psv2_s_s_a_t_w
                 ) + gp.quicksum(
-                    aquiring_cost[s, t] * new_psv2_s_t_w[s, t, w] / eac**(t-1) for s in S
+                    aquiring_cost[s, t] * new_psv2_s_t_w[s, t, w] / eac**(t-1) for s in S if (s,t,w) in new_psv2_s_t_w
                 ) - gp.quicksum(
                     selling_revenue[s, a, t] * scrap_psv2_s_a_t_w[s, a, t, w] / eac**(t-1)
                     for s in S for a in A if (s,a,t,w) in scrap_psv2_s_a_t_w
@@ -176,19 +181,21 @@ def SVFRRP_model(sets, params):
     # Trenger vi den egentlig??
     for s in S:
         for t in T1:
-            model.addConstr(
-                new_psv1_s_t[s,t] <= 5,
-                name = f'psv_buy_s1_{s}_{t}'
-            )
+            if (s,t) in new_psv1_s_t:
+                model.addConstr(
+                    new_psv1_s_t[s,t] <= 5,
+                    name = f'psv_buy_s1_{s}_{t}'
+                )
     model.update()
 
     for s in S:
         for t in T2:
             for w in O:
-                model.addConstr(
-                    new_psv2_s_t_w[s,t, w] <= 5,
-                    name = f'psv_buy_s2_{s}_{t}_{w}'
-                )
+                if (s,t,w) in new_psv2_s_t_w:
+                    model.addConstr(
+                        new_psv2_s_t_w[s,t, w] <= 5,
+                        name = f'psv_buy_s2_{s}_{t}_{w}'
+                    )
     model.update()
 
     #model.addConstr(new_psv_s_t[1,2]==3)
@@ -199,10 +206,11 @@ def SVFRRP_model(sets, params):
             scrap_psv = gp.LinExpr()
             if (s,a,t) in scrap_psv1_s_a_t:
                 scrap_psv = scrap_psv1_s_a_t[s,a,t]
-            model.addConstr(
-                scrap_psv <= new_psv1_s_t[s,t-1],
-                name = f'psv_sell_s1_{s}_{t}'
-            )
+            if (s,t-1) in new_psv1_s_t:
+                model.addConstr(
+                    scrap_psv <= new_psv1_s_t[s,t-1],
+                    name = f'psv_sell_s1_{s}_{t}'
+                )
     model.update()
 
     # Constraint 5.3 (init_retrosale_fleet_balance)
@@ -248,6 +256,7 @@ def SVFRRP_model(sets, params):
     for s in S:
         for t in sorted(T1)[1:]:
             a = 0
+
             retrofitted_psvs_from = gp.LinExpr()
             retrofitted_psvs_to = gp.LinExpr()
             scrap_psv = gp.LinExpr()
@@ -258,10 +267,13 @@ def SVFRRP_model(sets, params):
                     retrofitted_psvs_from.add(retro_psv1_s_s_a_t[s, s1, a, t])  # Sum of psv retrofitted from type s
                 if (s1, s, a, t) in retro_psv1_s_s_a_t:
                     retrofitted_psvs_to.add(retro_psv1_s_s_a_t[s1, s, a, t])  # Sum of psv retrofitted to type sed_psvs_to.add(retro_psv1_s_s_a_t[s2, s, a, t],0)  # Sum of psv retrofitted to type s
+            if (s,t-1) in new_psv1_s_t:
+                new_psv = new_psv1_s_t[s,t-1]
             model.addConstr(
-                new_psv1_s_t[s,t-1] - scrap_psv - retrofitted_psvs_from + retrofitted_psvs_to == psv1_s_a_t[s, a, t], 
+                new_psv - scrap_psv - retrofitted_psvs_from + retrofitted_psvs_to == psv1_s_a_t[s, a, t], 
                 name=f'psv_age_bal_const2_s1_{s}_{a}_{t}'
             )
+            new_psv = 0
 
     # Constraint 5.5 (retrosale_fleet_balance)
     # fiks
@@ -283,8 +295,11 @@ def SVFRRP_model(sets, params):
         for t in sorted(T1)[1:]:
             # print('t', t)
             a = 0
+            new_psv = 0
+            if (s, t-1) in new_psv1_s_t:
+                new_psv = new_psv1_s_t[s,t-1]
             model.addConstr(
-                new_psv1_s_t[s,t-1] == psv1_s_a_t[s, a, t],
+                psv1_s_a_t[s, a, t] == new_psv,
                 name = f'psv_period_balance_const_s1_{s}_{t}'
             )
     
@@ -310,10 +325,17 @@ def SVFRRP_model(sets, params):
             for a in A:
                 for f in F_s:
                     for r in R_s:
-                        if f == 1 or f==2:
-                            total_emissions.add(emissions[f, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t)
-                        else:
-                            total_emissions.add(emissions[f, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t/ emission_factor**t)
+                        if f == 1 or f == 2: 
+                            if s == 5 or s == 6 or s == 7 or s == 8: # 80% utslipp på mindre båter
+                                total_emissions.add(emissions[f, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t * 0.8)
+                            else: 
+                                total_emissions.add(emissions[f, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t)
+                        else: # forgrønningsfaktor på grønne fuels
+                            if s == 5 or s == 6 or s == 7 or s == 8: # 80% utslipp på mindre båter
+                                total_emissions.add(emissions[f, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t/ emission_factor**t * 0.8)
+                            else: 
+                                total_emissions.add(emissions[f, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t/ emission_factor**t)
+                           
         model.addConstr(
             total_emissions <= max_em_period[t],
             name= f'max_emissions_period_constraint_s1'
@@ -391,8 +413,11 @@ def SVFRRP_model(sets, params):
             scrap_psv = gp.LinExpr()
             if (s,a,t,w) in scrap_psv2_s_a_t_w:
                 scrap_psv = scrap_psv2_s_a_t_w[s,a,t,w]
+            new_psv = 0
+            if (s, t-1) in new_psv1_s_t:
+                new_psv = new_psv1_s_t[s,t-1]
             model.addConstr(
-                new_psv1_s_t[s,t-1] - scrap_psv - retrofitted_psvs_from + retrofitted_psvs_to == psv2_s_a_t_w[s, a, t, w], 
+                new_psv - scrap_psv - retrofitted_psvs_from + retrofitted_psvs_to == psv2_s_a_t_w[s, a, t, w], 
                 name=f'psv_age_bal_const2_na_{s}_{a}_{t}'
             )
 
@@ -419,8 +444,11 @@ def SVFRRP_model(sets, params):
         for w in O:
             t=2
             a = 0
+            new_psv = 0
+            if (s, t-1) in new_psv1_s_t:
+                new_psv = new_psv1_s_t[s,t-1]
             model.addConstr(
-                psv2_s_a_t_w[s, a, t, w] == new_psv1_s_t[s,t-1] ,
+                psv2_s_a_t_w[s, a, t, w] == new_psv ,
                 name = f'psv_period_balance_const_na_{s}_{t}_{w}'
             )
     
@@ -475,8 +503,11 @@ def SVFRRP_model(sets, params):
     for s in S:
         for w in O:
             for t in T2:
+                new_psv = 0
+            if (s, t, w) in new_psv2_s_t_w:
+                new_psv = new_psv2_s_t_w[s,t, w]
                 model.addConstr(
-                    new_psv2_s_t_w[s,t, w] <= 18,
+                    new_psv <= 18,
                     name = f'psv_buy_s2_{s}_{t}_{w}'
                 )
     model.update()
@@ -489,8 +520,11 @@ def SVFRRP_model(sets, params):
                 scrap_psv = gp.LinExpr()
                 if (s,a,t,w) in scrap_psv2_s_a_t_w:
                     scrap_psv = scrap_psv2_s_a_t_w[s,a,t,w]
+                new_psv = 0
+                if (s, t-1, w) in new_psv2_s_t_w:
+                    new_psv = new_psv2_s_t_w[s,t-1, w]
                 model.addConstr(
-                    scrap_psv <= new_psv2_s_t_w[s,t-1, w],
+                    scrap_psv <= new_psv,
                     name = f'psv_sell_s2_{s}_{t}_{w}'
                 )
     model.update()
@@ -534,8 +568,11 @@ def SVFRRP_model(sets, params):
                 scrap_psv = gp.LinExpr()
                 if (s,a,t,w) in scrap_psv2_s_a_t_w:
                     scrap_psv = scrap_psv2_s_a_t_w[s,a,t,w]
+                new_psv = 0
+                if (s, t-1, w) in new_psv2_s_t_w:
+                    new_psv = new_psv2_s_t_w[s,t-1, w]
                 model.addConstr(
-                    new_psv2_s_t_w[s,t-1, w] - scrap_psv - retrofitted_psvs_from + retrofitted_psvs_to == psv2_s_a_t_w[s, a, t, w], 
+                    new_psv - scrap_psv - retrofitted_psvs_from + retrofitted_psvs_to == psv2_s_a_t_w[s, a, t, w], 
                     name=f'psv_age_bal_const2_s2_{s}_{a}_{t}_{w}'
                 )
 
@@ -563,8 +600,11 @@ def SVFRRP_model(sets, params):
             for t in sorted(T2)[1:]:
                 # print('t', t)
                 a = 0
+                new_psv = 0
+                if (s, t-1, w) in new_psv2_s_t_w:
+                    new_psv = new_psv2_s_t_w[s,t-1, w]
                 model.addConstr(
-                    new_psv2_s_t_w[s,t-1, w] == psv2_s_a_t_w[s, a, t, w],
+                    psv2_s_a_t_w[s, a, t, w] == new_psv,
                     name = f'psv_period_balance_const_s2_{s}_{t}_{w}'
                 )
     
@@ -593,10 +633,18 @@ def SVFRRP_model(sets, params):
                     for a in A:
                         for f in F_s:
                             for r in R_s:
-                                if f == 1 or f==2:
-                                    total_emissions.add(emissions[f, r] * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t)
-                                else:
-                                    total_emissions.add(emissions[f, r] * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t/ emission_factor**t)
+                                if f == 1 or f == 2: 
+                                    if s == 5 or s == 6 or s == 7 or s == 8: # 80% utslipp på mindre båter
+                                        total_emissions.add(emissions[f, r] * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t * 0.8)
+                                    else: 
+                                        total_emissions.add(emissions[f, r] * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t)
+                                else: # forgrønningsfaktor på grønne fuels
+                                    if s == 5 or s == 6 or s == 7 or s == 8: # 80% utslipp på mindre båter
+                                        total_emissions.add(emissions[f, r] * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t/ emission_factor**t * 0.8)
+                                    else: 
+                                        total_emissions.add(emissions[f, r] * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t/ emission_factor**t)
+                    
+                
                 model.addConstr(
                     total_emissions <= max_em_period[t],
                     name= f'max_emissions_period_constraint_s2_{w}'
@@ -650,12 +698,11 @@ def SVFRRP_model(sets, params):
     for w in O:
         for s in S:
             t = sorted(T2)[-1]
-            new_psv2_s_t_w = 0
-            model.addConstr(
-                        time_used_psv <= max_time * psv2_s_a_t_w[s,a,t, w], 
-                        name=f'notbuylastperiod_{s}_{t}_{w}'
-                    )
-        
+            new_psv = 0
+            if (s, t, w) in new_psv2_s_t_w:
+                model.addConstr(new_psv2_s_t_w[s,t, w] == 0, 
+                            name=f'notbuylastperiod_{s}_{t}_{w}'
+                        )
 
     model.update()
     
@@ -664,7 +711,7 @@ def SVFRRP_model(sets, params):
 
 model = SVFRRP_model(sets, parameters)
 # Set the MIPGap to 1% (0.01)
-model.setParam('MIPGap', 0.005)
+model.setParam('MIPGap', 0.001)
 # Set the TimeLimit to 10 hours (36000 seconds)
 model.setParam('TimeLimit', 36000)
 model.optimize() 
