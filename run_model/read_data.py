@@ -4,13 +4,14 @@ import math
 
 # file_path = 'data_generation/Parameterdata-sheets.xlsx'
 # setssheet = 'data_generation/SetData-sheets.xlsx'
+#file_path = 'Dummy-Parameterdata-sheets.xlsx'
 sheet_dictionaries = {}
 
 
 def get_parameters(filename):
 
     sheet_names = {'Cost of retrofitting', 'Cost of newbuilding', 'Cost of fuel 1', 'Cost of fuel 2','Time used',
-                    'Revenue', 'Demand', 'Compatibility rs', 'Installations in route', 'Max Emissions', 'Initial fleet', 'Emissions', 'Compatibility fs', 'Probability'}
+                    'Revenue', 'Demand', 'Compatibility rs', 'Installations in route', 'Max Emissions', 'Initial fleet', 'Emissions', 'Compatibility fs', 'Probability', 'Distance', 'Specific distance'}
     sheet_dictionaries = {}
 
     for sheet in sheet_names:
@@ -95,8 +96,8 @@ def compare_dictionaries(dict1, dict2):
 #print(parameters)
 
 def get_sets(filename):
-    sheet_names = {'Power systems', 'Ages', 'Routes',
-                   'Time periods 1', 'Time periods 2', 'Installations', 'Fuel types', 'Scenarios'}
+    sheet_names = {'Power systems', 'Ages', 'Routes', 'Time periods',
+                   'Time periods 1', 'Time periods 2', 'TP2 scrap', 'Installations', 'Fuel types', 'Scenarios'}
     sheet_dictionaries = {}
 
     for sheet in sheet_names:
