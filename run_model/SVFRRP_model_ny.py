@@ -20,7 +20,7 @@ file_sets = 'SetData-sheets.xlsx' # "data_generation/SetData-sheets.xlsx"
 #file_sets = '../run_mastermodell_m_gammel_data/Dummy2-SetData-sheets-1w.xlsx'
 sets = get_sets(file_sets)
 print('Sets values loaded')
-#print(sets)
+
 
 
 total_emissions_per_t = {}
@@ -70,7 +70,7 @@ def SVFRRP_model(sets, params):
     probability = params['Probability']  # P_w
     not_buy_new = [9, 10]
     distance = params['Distance']
-    electric_distance = params['Specific distance']
+    
     
 
 
@@ -119,22 +119,20 @@ def SVFRRP_model(sets, params):
 
 
 
+    
     total_cost_per_t_s2 = {
-    (t, w): (probability[w] * (
-        gp.quicksum(
-            retro_cost[s, s1] * retro_psv2_s_s_a_t_w[s, s1, a, t, w] / eac**(5*(t-1))
-            for s in S for a in A for s1 in S if (s, s1, a, t, w) in retro_psv2_s_s_a_t_w
-        ) + gp.quicksum(
-            aquiring_cost[s] * new_psv2_s_t_w[s, t, w] / eac**(5*(t-1))
-            for s in S if (s, t, w) in new_psv2_s_t_w
-        ) + gp.quicksum(
-            fuel_cost2[f, t, w] / eac**(5*(t-1)) * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t * (
-                electric_distance[r] if f == 6 else distance[r]
-            )
-            for f in F_s for s in S for r in R_s for a in A
-        )
-    )) for t in T2 for w in O
-}
+        (t, w): (probability[w] * (gp.quicksum(
+                    retro_cost[s, s1] * retro_psv2_s_s_a_t_w[s, s1, a, t, w] / eac**(5*(t-1))
+                    for s in S for a in A for s1 in S if (s, s1, a, t, w) in retro_psv2_s_s_a_t_w
+                ) + gp.quicksum(
+                    aquiring_cost[s] * new_psv2_s_t_w[s, t, w] / eac**(5*(t-1)) for s in S if (s,t,w) in new_psv2_s_t_w
+                ) 
+                ) + gp.quicksum(
+                    (fuel_cost2[f, t, w]) / eac**(5*(t-1)) * weekly_routes2_s_a_f_r_t_w[s,a,f,r,t, w] * week_to_t * distance[r]
+                    for s in S for a in A for f in F_s for r in R_s
+                )
+        ) for t in T2 for w in O
+    }
 
     scrap_cost_t2 = {
         (t, w): probability[w] * gp.quicksum( -
@@ -359,7 +357,7 @@ def SVFRRP_model(sets, params):
                             else: 
                                 total_emissions.add(emissions[f, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t)
                         else: # forgrønningsfaktor på grønne fuels
-                            if s == 5 or s == 6 or s == 7 or s == 8: # 80% utslipp på mindre båter
+                            if s == 5 or s == 6 or s == 7 or s == 8 or s == 9: # 80% utslipp på mindre båter
                                 total_emissions.add(emissions[f, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t/ emission_factor**t * 0.8)
                             else: 
                                 total_emissions.add(emissions[f, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t/ emission_factor**t)
@@ -752,7 +750,7 @@ def SVFRRP_model(sets, params):
 print('Line before start running model ')
 model, T = SVFRRP_model(sets, parameters)
 # Set the MIPGap to 1% (0.01)
-model.setParam('MIPGap', 0.001)
+model.setParam('MIPGap', 0.05)
 # Set the TimeLimit to 10 hours (36000 seconds)
 model.setParam('TimeLimit', 36000)
 model.optimize() 
