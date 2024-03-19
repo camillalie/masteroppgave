@@ -11,7 +11,7 @@ sheet_dictionaries = {}
 def get_parameters(filename):
 
     sheet_names = {'Cost of retrofitting', 'Cost of newbuilding', 'Cost of fuel 1', 'Cost of fuel 2','Time used',
-                    'Revenue', 'Demand', 'Compatibility rs', 'Installations in route', 'Max Emissions', 'Initial fleet', 'Emissions', 'Compatibility fs', 'Probability', 'Distance', 'Specific distance'}
+                    'Revenue', 'Demand', 'Compatibility rs', 'Installations in route', 'Max Emissions', 'Initial fleet', 'Emissions', 'Compatibility fs', 'Probability', 'Distance'}
     sheet_dictionaries = {}
 
     for sheet in sheet_names:
