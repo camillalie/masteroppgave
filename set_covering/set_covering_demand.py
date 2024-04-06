@@ -23,7 +23,7 @@ def set_covering_model():
 
     # List of platforms with corresponding numbers
     platforms = [
-        "MON", "GFAGFBGFC", "APT", "STASTB", "ASL", "DAB", "OSE", 
+        "GFAGFBGFC", "APT", "STASTB", "ASL", "DAB", "OSE", 
         "DSA", "DSS", "STC", "KVB", "MID", "NLNVAL", "OSC", "OSOVFB", "OSS", "TENTRB", "TEQTRC", "TRO"
     ]
 
@@ -37,16 +37,25 @@ def set_covering_model():
         for row_number, row in enumerate(reader, 1):
             platform_numbers = [platform_to_number[platform] for platform in row if platform != "MON"]
             routes_dict[row_number] = platform_numbers
-            #print(f"Row {row_number}: {row}, Platform Numbers: {platform_numbers}")  # Debugging statement
-        print(routes_dict)
-        print('platform to number: ', platform_to_number)
+            
 
     with open('../route_generation/generated_datafiles/mj_route.csv', 'r') as file:
         reader = csv.reader(file)
         for row_number, row in enumerate(reader, 1):
             value = float(row[0])
             mj_route_dict[row_number] = value
-    print('Mj route dict: ', len(routes_dict))
+    #print('Mj route dict: ', mj_route_dict)
+
+
+    platform_visits_path = '../route_generation/clustering/output_platforms_visits.csv'
+    df = pd.read_csv(platform_visits_path, delimiter=';')
+
+    # Create a dictionary from the DataFrame
+    platform_dict = {idx + 1: row['visits'] for idx, row in df.iterrows()}
+
+    print(platform_dict)
+    platforms = range(1,len(platform_dict))
+
     # Define sailed_routes variable
     routes = range(1, len(routes_dict))
     sailed_routes = model.addVars(routes, vtype=gp.GRB.BINARY, name="sailed_routes_r")
@@ -59,7 +68,7 @@ def set_covering_model():
     for platform_num in platform_to_number.values():
         covering_routes = [r for r in routes if platform_num in routes_dict[r]]
         visited_platform = gp.quicksum(sailed_routes[r] for r in covering_routes)
-        model.addConstr(visited_platform >= 1, name=f"visit_at_least_once_{platform_num}")
+        model.addConstr(visited_platform >= platform_dict[platform_num], name=f"visit_at_least_once_{platform_num}")
     
     model.update()
     model.optimize()
@@ -75,7 +84,7 @@ def set_covering_model():
 
 
 def write_output_file(sailed_routes):
-    with open('output_routes.csv', 'w', newline='') as file:
+    with open('output_routes_demand.csv', 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Route Number', 'Sailed'])
         
