@@ -20,6 +20,7 @@ def set_covering_model():
     routes_dict = {}
     platform_to_number = {}
     mj_route_dict = {}
+    demand_dict = {}
 
     # List of platforms with corresponding numbers
     platforms = [
@@ -32,43 +33,56 @@ def set_covering_model():
         platform_to_number[platform] = idx
 
     # Read the CSV files and populate the dictionaries
-    with open('../route_generation/generated_datafiles/routes.csv', 'r') as file:
+    with open('../route_generation_mongstad/generated_datafiles/routes.csv', 'r') as file:
         reader = csv.reader(file)
         for row_number, row in enumerate(reader, 1):
             platform_numbers = [platform_to_number[platform] for platform in row if platform != "MON"]
             routes_dict[row_number] = platform_numbers
             
 
-    with open('../route_generation/generated_datafiles/mj_route.csv', 'r') as file:
+    with open('../route_generation_mongstad/generated_datafiles/mj_route.csv', 'r') as file:
         reader = csv.reader(file)
         for row_number, row in enumerate(reader, 1):
             value = float(row[0])
             mj_route_dict[row_number] = value
+    
+    with open('../route_generation_mongstad/generated_datafiles/demand.csv', 'r') as file:
+        reader = csv.reader(file)
+        next(reader)
+        for row_number, row in enumerate(reader, 1):
+            value = float(row[0])
+            demand_dict[row_number] = value
     #print('Mj route dict: ', mj_route_dict)
+    #print('demand dict: ', demand_dict)
 
 
-    platform_visits_path = '../route_generation/clustering/output_platforms_visits.csv'
+    platform_visits_path = '../route_generation_mongstad/clustering/output_platforms_visits.csv'
     df = pd.read_csv(platform_visits_path, delimiter=';')
 
     # Create a dictionary from the DataFrame
     platform_dict = {idx + 1: row['visits'] for idx, row in df.iterrows()}
 
     print(platform_dict)
-    platforms = range(1,len(platform_dict))
+
+    
 
     # Define sailed_routes variable
     routes = range(1, len(routes_dict))
-    sailed_routes = model.addVars(routes, vtype=gp.GRB.BINARY, name="sailed_routes_r")
+    sailed_routes = model.addVars(routes, vtype=gp.GRB.INTEGER, name="sailed_routes_r")
 
     # Objective function
     total_distance = gp.quicksum(mj_route_dict[r] * sailed_routes[r] for r in routes)
-    model.setObjective(total_distance, sense=gp.GRB.MINIMIZE)
+    total_demand = gp.quicksum(demand_dict[r] * sailed_routes[r] for r in routes)
+    model.setObjective(total_distance + total_demand*1500, sense=gp.GRB.MINIMIZE)
 
     
     for platform_num in platform_to_number.values():
         covering_routes = [r for r in routes if platform_num in routes_dict[r]]
         visited_platform = gp.quicksum(sailed_routes[r] for r in covering_routes)
         model.addConstr(visited_platform >= platform_dict[platform_num], name=f"visit_at_least_once_{platform_num}")
+    
+    # for route in routes:
+    #     model.addConstr(sailed_routes[route]*demand_dict[route] <= 80, name=f'el_demand_{route}')
     
     model.update()
     model.optimize()
@@ -84,7 +98,7 @@ def set_covering_model():
 
 
 def write_output_file(sailed_routes):
-    with open('output_routes_demand.csv', 'w', newline='') as file:
+    with open('output_routes_demand_70.csv', 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Route Number', 'Sailed'])
         
