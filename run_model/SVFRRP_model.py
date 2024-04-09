@@ -6,18 +6,14 @@ import sys
 import numpy as np
 
 # Get parameter values
-# file_parameters = 'data_generation/Parameterdata-sheets.xlsx'
 file_parameters = 'Parameterdata-sheets.xlsx'
-#file_parameters = 'Dummy-Parameterdata-sheets.xlsx'
-# file_parameters = '../run_mastermodell_m_gammel_data/Dummy2-Parameterdata-sheets-1w.xlsx'
+
 parameters = get_parameters(file_parameters)
-#print(parameters)
+
 
 print('Parameter values loaded')
 # Get set values
 file_sets = 'SetData-sheets.xlsx' # "data_generation/SetData-sheets.xlsx"
-#file_sets = 'Dummy-SetData-sheets.xlsx'
-#file_sets = '../run_mastermodell_m_gammel_data/Dummy2-SetData-sheets-1w.xlsx'
 sets = get_sets(file_sets)
 print('Sets values loaded')
 
@@ -70,6 +66,7 @@ def SVFRRP_model(sets, params):
     probability = params['Probability']  # P_w
     not_buy_new = [9, 10]
     distance = params['Distance']
+    bigMdelta = 10
     
     
 
@@ -84,18 +81,51 @@ def SVFRRP_model(sets, params):
     indices_newpsv_2 = [(s, t, w) for s in S if (s not in not_buy_new) for t in T2 for w in O]
 
     # Variables
-    psv1_s_a_t = model.addVars(S, A, T1, vtype=gp.GRB.INTEGER, lb=0, name="xsat1")    # x                      
+    psv1_s_a_t = model.addVars(S, A, T1, vtype=gp.GRB.INTEGER, lb=0, name="psv1_s_a_t")    # x                      
     retro_psv1_s_s_a_t = model.addVars(indices_retro, vtype=gp.GRB.INTEGER, lb=0, name="retro_psv1_s_s_a_t")                 # y^r
     new_psv1_s_t = model.addVars(indices_newpsv_1, vtype=gp.GRB.INTEGER, lb=0, name="new_psv1_s_t")                          # y^N
     scrap_psv1_s_a_t = model.addVars(indices_scrap_1, vtype=gp.GRB.INTEGER, lb=0, name="scrap_psv1_s_a_t")                   # y^S
     weekly_routes1_s_a_f_r_t = model.addVars(S, A,F_s, R_s, T1, vtype=gp.GRB.INTEGER, name="weekly_routes1_s_a_f_r_t")       #z^T
+    delta1_s_t = model.addVars(S,T1, vtype=gp.GRB.BINARY, lb=0, name="delta1_s_t")
 
     # stage 2 variables
-    psv2_s_a_t_w = model.addVars(S, A, T2, O, vtype=gp.GRB.INTEGER, lb=0, name="xsat2")                                   # x
+    psv2_s_a_t_w = model.addVars(S, A, T2, O, vtype=gp.GRB.INTEGER, lb=0, name="psv2_s_a_t_w")                                   # x
     retro_psv2_s_s_a_t_w = model.addVars(indices_retro, vtype=gp.GRB.INTEGER, lb=0, name="retro_psv2_s_s_a_t_w")              # y^r
     new_psv2_s_t_w = model.addVars(indices_newpsv_2, vtype=gp.GRB.INTEGER, lb=0, name="new_psv2_s_t_w")                            # y^N
     scrap_psv2_s_a_t_w = model.addVars(indices_scrap_2, vtype=gp.GRB.INTEGER, lb=0, name="scrap_psv2_s_a_t_w")                   # y^S
     weekly_routes2_s_a_f_r_t_w = model.addVars(S, A,F_s, R_s, T2, O, vtype=gp.GRB.INTEGER, name="weekly_routes2_s_a_f_r_t_w")            #z^T
+    delta2_s_t_w = model.addVars(S,T2, O, vtype=gp.GRB.BINARY, lb=0, name="delta2_s_t_w")
+
+    model.update()
+    
+    ##############
+    # Branching priority
+    ##############
+
+    branching_priorities = {
+    "psv1_s_a_t": 2,
+    "psv2_s_a_t_w": 2,
+    "retro_psv1_s_s_a_t": 3,
+    "retro_psv2_s_s_a_t_w": 3,
+    "new_psv1_s_t": 4, 
+    "new_psv2_s_t_w": 4,
+    "scrap_psv1_s_a_t":5, 
+    "scrap_psv2_s_a_t_w": 5,
+    "weekly_routes1_s_a_f_r_t": 6,
+    "weekly_routes2_s_a_f_r_t_w": 6,
+    "delta1_s_t": 1, 
+    "delta2_s_t_w": 1
+    }
+
+    # Add more variables and priorities as needed
+
+    # Set branching priorities using the dictionary
+    for v in model.getVars():
+        var_name = v.VarName.split('[')[0]  # Extracting variable name without indices
+        if var_name in branching_priorities:
+            v.setAttr(gp.GRB.Attr.BranchPriority, branching_priorities[var_name])
+        else:
+            print(f"Variable {var_name} not found in the model.")
 
 
 
@@ -107,30 +137,47 @@ def SVFRRP_model(sets, params):
         t: gp.quicksum(
             retro_cost[s, s1] * retro_psv1_s_s_a_t[s, s1, a, t]/eac**(5*(t-1))
             for s in S for a in A for s1 in S if (s, s1, a, t) in retro_psv1_s_s_a_t
-        ) + gp.quicksum(
-            aquiring_cost[s] * new_psv1_s_t[s, t]/eac**(5*(t-1)) for s in S if (s,t) in new_psv1_s_t
         ) - gp.quicksum(
             selling_revenue[s, a] * scrap_psv1_s_a_t[s, a, t]/eac**(5*(t-1)) for s in S for a in A if (s,a,t) in scrap_psv1_s_a_t
-        ) + gp.quicksum(
+        ) for t in T1
+    }
+
+    acquiring_cost_per_t_s1 = {
+        t: gp.quicksum(
+            aquiring_cost[s] * new_psv1_s_t[s, t]/eac**(5*(t-1)) for s in S if (s,t) in new_psv1_s_t
+        ) for t in T1
+    }
+
+    fuel_cost_per_t_s1 = {
+        t: gp.quicksum(
             (fuel_cost1[f, r] * 0.4 if t == 1 else fuel_cost1[f, r])/eac**(5*(t-1)) * weekly_routes1_s_a_f_r_t[s,a,f,r,t] * week_to_t
             for s in S for a in A for f in F_s for r in R_s
-        ) for t in T1
+            ) for t in T1
     }
 
 
 
     
-    total_cost_per_t_s2 = {
+    retro_cost_per_t_s2 = {
         (t, w): (probability[w] * (gp.quicksum(
                     retro_cost[s, s1] * retro_psv2_s_s_a_t_w[s, s1, a, t, w] / eac**(5*(t-1))
                     for s in S for a in A for s1 in S if (s, s1, a, t, w) in retro_psv2_s_s_a_t_w
-                ) + gp.quicksum(
+                ) 
+        )
+        ) for t in T2 for w in O
+    }
+    acquiring_cost_per_t_s2 = {
+        (t,w): (probability[w] * gp.quicksum(
                     aquiring_cost[s] * new_psv2_s_t_w[s, t, w] / eac**(5*(t-1)) for s in S if (s,t,w) in new_psv2_s_t_w
                 ) 
-                ) + gp.quicksum(
+        )for t in T2 for w in O
+    }
+
+    fuel_cost_per_t_s2 = {
+        (t,w): (probability[w] * (gp.quicksum(
                     (fuel_cost2[f, t, w]) / eac**(5*(t-1)) * weekly_routes2_s_a_f_r_t_w[s,a,f,r,t, w] * week_to_t * distance[r]
                     for s in S for a in A for f in F_s for r in R_s
-                )
+                ) )
         ) for t in T2 for w in O
     }
 
@@ -143,13 +190,27 @@ def SVFRRP_model(sets, params):
 
 
 
-    total_cost = gp.quicksum(total_cost_per_t_s1[t] for t in T1) + gp.quicksum(total_cost_per_t_s2[t,w] for t in T2 for w in O) + gp.quicksum(scrap_cost_t2[t,w] for t in T2scrap for w in O)
+    total_cost_s1 = gp.quicksum(total_cost_per_t_s1[t] for t in T1) + gp.quicksum(fuel_cost_per_t_s1[t] for t in T1) + gp.quicksum(acquiring_cost_per_t_s1[t] for t in T1)
+    total_cost_s2 = gp.quicksum(retro_cost_per_t_s2[t,w] for t in T2 for w in O) + gp.quicksum(scrap_cost_t2[t,w] for t in T2scrap for w in O) + gp.quicksum(fuel_cost_per_t_s2[t,w] for t in T2 for w in O) + gp.quicksum(acquiring_cost_per_t_s2[t,w] for t in T2 for w in O)
+    total_cost = total_cost_s1 + total_cost_s2 
+
     model.setObjective(total_cost, sense=gp.GRB.MINIMIZE)
+    model.update()
+
 
     
     #####################
     # STAGE 1
     #####################
+
+
+    # BESTEMME SYSTEM I HVER TIDSPERIODE
+    for s in S:
+        for t in T1:
+            xst = gp.quicksum(psv1_s_a_t[s, a, t] for a in A)
+            model.addConstr(
+                bigMdelta * delta1_s_t[s, t] >= xst, name=f'system_per_tp_{s}_{t}'
+            )
 
     # # Fuel - system Compatibility constraint
     # Fuel - system Compatibility constraint
@@ -497,6 +558,15 @@ def SVFRRP_model(sets, params):
     #####################
     # STAGE 2 
     #####################
+
+     # BESTEMME SYSTEM I HVER TIDSPERIODE
+    for w in O:
+        for s in S:
+            for t in T2:
+                xst = gp.quicksum(psv2_s_a_t_w[s, a, t, w] for a in A)
+                model.addConstr(
+                    bigMdelta * delta2_s_t_w[s, t, w] >= xst, name=f'system_per_tp2_{s}_{t}_{w}'
+                )
                 
                 
     # Fuel - system Compatibility constraint
@@ -750,7 +820,8 @@ def SVFRRP_model(sets, params):
 print('Line before start running model ')
 model, T = SVFRRP_model(sets, parameters)
 # Set the MIPGap to 1% (0.01)
-model.setParam('MIPGap', 0.01)
+model.setParam('MIPGap', 0.001)# 0.001)
+
 # Set the TimeLimit to 10 hours (36000 seconds)
 model.setParam('TimeLimit', 10800)
 model.optimize() 
@@ -792,6 +863,7 @@ if model.status == gp.GRB.OPTIMAL:
 
     for t in T:
         print(f"Total Emissions for time period {t}: {total_emissions_per_t[t].getValue()}")
+        
     
     with open(outputfilepath, mode='a', newline='') as file:
         # Write header
