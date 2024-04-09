@@ -4,7 +4,7 @@ import math
 import csv
 import gurobipy as gp
 
-file_path = '../run_model/Parameterdata-sheets.xlsx'
+#file_path = '../run_model/Parameterdata-sheets.xlsx'
 # setssheet = 'data_generation/SetData-sheets.xlsx'
 #file_path = 'Dummy-Parameterdata-sheets.xlsx'
 sheet_dictionaries = {}
@@ -27,26 +27,27 @@ def set_covering_model():
         "GFAGFBGFC", "APT", "STASTB", "ASL", "DAB", "OSE", 
         "DSA", "DSS", "STC", "KVB", "MID", "NLNVAL", "OSC", "OSOVFB", "OSS", "TENTRB", "TEQTRC", "TRO"
     ]
+    
 
     # Create mapping from platform to number
     for idx, platform in enumerate(platforms, start=1):
         platform_to_number[platform] = idx
 
     # Read the CSV files and populate the dictionaries
-    with open('../route_generation_mongstad/generated_datafiles/routes.csv', 'r') as file:
+    with open('../route_generation_mongstad/generated_datafiles_setcover100/routes.csv', 'r') as file:
         reader = csv.reader(file)
         for row_number, row in enumerate(reader, 1):
-            platform_numbers = [platform_to_number[platform] for platform in row if platform != "MON"]
+            platform_numbers = [platform_to_number[platform] for platform in row if platform !=  "MON" ] # endre til MON
             routes_dict[row_number] = platform_numbers
             
 
-    with open('../route_generation_mongstad/generated_datafiles/mj_route.csv', 'r') as file:
+    with open('../route_generation_mongstad/generated_datafiles_setcover100/mj_route.csv', 'r') as file:
         reader = csv.reader(file)
         for row_number, row in enumerate(reader, 1):
             value = float(row[0])
             mj_route_dict[row_number] = value
     
-    with open('../route_generation_mongstad/generated_datafiles/demand.csv', 'r') as file:
+    with open('../route_generation_mongstad/generated_datafiles_setcover100/demand.csv', 'r') as file:
         reader = csv.reader(file)
         next(reader)
         for row_number, row in enumerate(reader, 1):
@@ -98,7 +99,7 @@ def set_covering_model():
 
 
 def write_output_file(sailed_routes):
-    with open('output_routes_demand_70.csv', 'w', newline='') as file:
+    with open('output_routes_c100.csv', 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Route Number', 'Sailed'])
         
