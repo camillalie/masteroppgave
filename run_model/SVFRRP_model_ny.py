@@ -750,9 +750,9 @@ def SVFRRP_model(sets, params):
 print('Line before start running model ')
 model, T = SVFRRP_model(sets, parameters)
 # Set the MIPGap to 1% (0.01)
-model.setParam('MIPGap', 0.05)
+model.setParam('MIPGap', 0.01)
 # Set the TimeLimit to 10 hours (36000 seconds)
-model.setParam('TimeLimit', 36000)
+model.setParam('TimeLimit', 10800)
 model.optimize() 
 
 max_em_param = parameters['Max Emissions'] 

@@ -137,10 +137,14 @@ def SVFRRP_model(sets, params):
         t: gp.quicksum(
             retro_cost[s, s1] * retro_psv1_s_s_a_t[s, s1, a, t]/eac**(5*(t-1))
             for s in S for a in A for s1 in S if (s, s1, a, t) in retro_psv1_s_s_a_t
-        ) + gp.quicksum(
-            aquiring_cost[s] * new_psv1_s_t[s, t]/eac**(5*(t-1)) for s in S if (s,t) in new_psv1_s_t
         ) - gp.quicksum(
             selling_revenue[s, a] * scrap_psv1_s_a_t[s, a, t]/eac**(5*(t-1)) for s in S for a in A if (s,a,t) in scrap_psv1_s_a_t
+        ) for t in T1
+    }
+
+    acquiring_cost_per_t_s1 = {
+        t: gp.quicksum(
+            aquiring_cost[s] * new_psv1_s_t[s, t]/eac**(5*(t-1)) for s in S if (s,t) in new_psv1_s_t
         ) for t in T1
     }
 
@@ -154,15 +158,19 @@ def SVFRRP_model(sets, params):
 
 
     
-    total_cost_per_t_s2 = {
+    retro_cost_per_t_s2 = {
         (t, w): (probability[w] * (gp.quicksum(
                     retro_cost[s, s1] * retro_psv2_s_s_a_t_w[s, s1, a, t, w] / eac**(5*(t-1))
                     for s in S for a in A for s1 in S if (s, s1, a, t, w) in retro_psv2_s_s_a_t_w
-                ) + gp.quicksum(
-                    aquiring_cost[s] * new_psv2_s_t_w[s, t, w] / eac**(5*(t-1)) for s in S if (s,t,w) in new_psv2_s_t_w
                 ) 
         )
         ) for t in T2 for w in O
+    }
+    acquiring_cost_per_t_s2 = {
+        (t,w): (probability[w] * gp.quicksum(
+                    aquiring_cost[s] * new_psv2_s_t_w[s, t, w] / eac**(5*(t-1)) for s in S if (s,t,w) in new_psv2_s_t_w
+                ) 
+        )for t in T2 for w in O
     }
 
     fuel_cost_per_t_s2 = {
@@ -182,7 +190,10 @@ def SVFRRP_model(sets, params):
 
 
 
-    total_cost = gp.quicksum(total_cost_per_t_s1[t] for t in T1) + gp.quicksum(total_cost_per_t_s2[t,w] for t in T2 for w in O) + gp.quicksum(scrap_cost_t2[t,w] for t in T2scrap for w in O) + gp.quicksum(fuel_cost_per_t_s1[t] for t in T1) + gp.quicksum(fuel_cost_per_t_s2[t,w] for t in T2 for w in O)
+    total_cost_s1 = gp.quicksum(total_cost_per_t_s1[t] for t in T1) + gp.quicksum(fuel_cost_per_t_s1[t] for t in T1) + gp.quicksum(acquiring_cost_per_t_s1[t] for t in T1)
+    total_cost_s2 = gp.quicksum(retro_cost_per_t_s2[t,w] for t in T2 for w in O) + gp.quicksum(scrap_cost_t2[t,w] for t in T2scrap for w in O) + gp.quicksum(fuel_cost_per_t_s2[t,w] for t in T2 for w in O) + gp.quicksum(acquiring_cost_per_t_s2[t,w] for t in T2 for w in O)
+    total_cost = total_cost_s1 + total_cost_s2 
+
     model.setObjective(total_cost, sense=gp.GRB.MINIMIZE)
     model.update()
 
@@ -812,7 +823,7 @@ model, T = SVFRRP_model(sets, parameters)
 model.setParam('MIPGap', 0.001)# 0.001)
 
 # Set the TimeLimit to 10 hours (36000 seconds)
-model.setParam('TimeLimit', 36000)
+model.setParam('TimeLimit', 10800)
 model.optimize() 
 
 max_em_param = parameters['Max Emissions'] 
@@ -852,6 +863,7 @@ if model.status == gp.GRB.OPTIMAL:
 
     for t in T:
         print(f"Total Emissions for time period {t}: {total_emissions_per_t[t].getValue()}")
+        
     
     with open(outputfilepath, mode='a', newline='') as file:
         # Write header
