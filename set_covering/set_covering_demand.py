@@ -4,14 +4,15 @@ import math
 import csv
 import gurobipy as gp
 
-#file_path = '../run_model/Parameterdata-sheets.xlsx'
-# setssheet = 'data_generation/SetData-sheets.xlsx'
-#file_path = 'Dummy-Parameterdata-sheets.xlsx'
+
 sheet_dictionaries = {}
 
 
-import csv
-import gurobipy as gp
+
+mappenavn = 'generated_datafiles_2239'
+outputnavn = '2239'
+
+
 
 def set_covering_model():
     model = gp.Model()
@@ -22,32 +23,35 @@ def set_covering_model():
     mj_route_dict = {}
     demand_dict = {}
 
+    df_platform = pd.read_csv('../route_generation_mongstad/clustering/output_platforms_demand.csv', delimiter=';')
     # List of platforms with corresponding numbers
-    platforms = [
-        "GFAGFBGFC", "APT", "STASTB", "ASL", "DAB", "OSE", 
-        "DSA", "DSS", "STC", "KVB", "MID", "NLNVAL", "OSC", "OSOVFB", "OSS", "TENTRB", "TEQTRC", "TRO"
-    ]
-    
+    # platforms = [
+    #     "GFAGFBGFC", "APT", "STASTB", "ASL", "DAB", "OSE", 
+    #     "DSA", "DSS", "STC", "KVB", "MID", "NLNVAL", "OSC", "OSOVFB", "OSS", "TENTRB", "TEQTRC", "TRO"
+    # ]
+    platforms = df_platform['platform'].tolist()
+    print(platforms)
 
     # Create mapping from platform to number
     for idx, platform in enumerate(platforms, start=1):
         platform_to_number[platform] = idx
 
     # Read the CSV files and populate the dictionaries
-    with open('../route_generation_mongstad/generated_datafiles_setcover100/routes.csv', 'r') as file:
+    with open(f'../route_generation_mongstad/{mappenavn}/routes.csv', 'r') as file:
         reader = csv.reader(file)
         for row_number, row in enumerate(reader, 1):
             platform_numbers = [platform_to_number[platform] for platform in row if platform !=  "MON" ] # endre til MON
             routes_dict[row_number] = platform_numbers
             
 
-    with open('../route_generation_mongstad/generated_datafiles_setcover100/mj_route.csv', 'r') as file:
+    with open(f'../route_generation_mongstad/{mappenavn}/mj_route.csv', 'r') as file:
         reader = csv.reader(file)
+        next(reader)
         for row_number, row in enumerate(reader, 1):
             value = float(row[0])
             mj_route_dict[row_number] = value
     
-    with open('../route_generation_mongstad/generated_datafiles_setcover100/demand.csv', 'r') as file:
+    with open(f'../route_generation_mongstad/{mappenavn}/demand.csv', 'r') as file:
         reader = csv.reader(file)
         next(reader)
         for row_number, row in enumerate(reader, 1):
@@ -99,7 +103,7 @@ def set_covering_model():
 
 
 def write_output_file(sailed_routes):
-    with open('output_routes_c100.csv', 'w', newline='') as file:
+    with open(f'output_routes_{outputnavn}.csv', 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Route Number', 'Sailed'])
         

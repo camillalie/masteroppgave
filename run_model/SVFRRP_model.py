@@ -4,9 +4,10 @@ import pandas as pd
 from read_data import get_parameters, get_sets
 import sys
 import numpy as np
+import time
 
 # Get parameter values
-file_parameters = 'Parameterdata-sheets.xlsx'
+file_parameters = 'Parameterdata.xlsx'
 
 parameters = get_parameters(file_parameters)
 
@@ -818,6 +819,8 @@ def SVFRRP_model(sets, params):
     return model, T
 
 print('Line before start running model ')
+
+start_time = time.time()
 model, T = SVFRRP_model(sets, parameters)
 # Set the MIPGap to 1% (0.01)
 model.setParam('MIPGap', 0.001)# 0.001)
@@ -825,29 +828,15 @@ model.setParam('MIPGap', 0.001)# 0.001)
 # Set the TimeLimit to 10 hours (36000 seconds)
 model.setParam('TimeLimit', 10800)
 model.optimize() 
-
+end_time = time.time()  # Record the end time
+total_running_time = end_time - start_time  # Calculate the total running time
 max_em_param = parameters['Max Emissions'] 
+num_variables = len(model.getVars())
+num_constraints = len(model.getConstrs())
 
 outputfilepath = 'output_file.txt'
 
-# # Check if the model is feasible
-# if model.status == gp.GRB.OPTIMAL:
-#     print("Optimal solution found!")
-#     # Print variable values associated with the last feasible solution found
-#     for var in model.getVars():
-#         print(f"{var.varName} = {var.Xn}")
-# elif model.status == gp.GRB.INFEASIBLE:
-#     print("Model is infeasible.")
-#     # Print variable values associated with the last feasible solution found
-#     for var in model.getVars():
-#         print(f"{var.varName} = {var.Xn}")
-# else:
-#     print("Optimization terminated with status:", model.status)
-# Number of variables
-#num_variables = model.NumVars
 
-        # Number of parameters
-#num_parameters = model.NumParams
 
 if model.status == gp.GRB.OPTIMAL:
     
@@ -863,7 +852,8 @@ if model.status == gp.GRB.OPTIMAL:
 
     for t in T:
         print(f"Total Emissions for time period {t}: {total_emissions_per_t[t].getValue()}")
-        
+    optimality_gap = model.getAttr('MIPGap')
+    print(f"Optimality Gap: {optimality_gap * 100}%")   
     
     with open(outputfilepath, mode='a', newline='') as file:
         # Write header
@@ -871,26 +861,20 @@ if model.status == gp.GRB.OPTIMAL:
         # Write the value
         file.write(f"{max_em_param}\n")
         file.write(f"Objective Value: {model.objVal}\n")
-
+        file.write(f"Optimality Gap: {optimality_gap * 100}%\n")
+        file.write(f"Total Running Time: {total_running_time} seconds\n")
+        file.write(f"Total number of variables: {num_variables}\n")
+        file.write(f"Total number of constraints: {num_constraints}\n")
+        
         for var in model.getVars():
             if var.Xn > 0:
                 file.write(f"{var.varName} = {var.Xn}\n")
-        
-#         # for t in T1:
-#         #     file.write(f"Total Emissions for time period {t}: {total_emissions_per_t[t].getValue()}\n")
-
-#         # file.write('Time Period, Total Cost\n')
-#         # for t in T1:
-#         #     file.write(f"{t}, {total_cost_per_t_s1[t].getValue()}\n")
-                
-        
-
-        # file.write(f"Number of variables: {num_variables}")
-        # file.write(f"Number of parameters: {num_parameters}")
-        # print(f"Number of variables: {num_variables}")
-        # print(f"Number of parameters: {num_parameters}")
+        for t in T:
+                 file.write(f"Total Emissions for time period {t}: {total_emissions_per_t[t].getValue()}\n")
+#  
             
 elif model.status == gp.GRB.TIME_LIMIT:
+    optimality_gap = model.getAttr('MIPGap')
     # Check if a feasible solution is found
     if model.SolCount > 0:
         print("A solution is found within the time limit.")
@@ -899,6 +883,10 @@ elif model.status == gp.GRB.TIME_LIMIT:
             # Write the value
             file.write(f"{max_em_param}\n")
             file.write(f"Objective Value: {model.objVal}\n")
+            file.write(f"Optimality Gap: {optimality_gap * 100}%\n")
+            file.write(f"Total Running Time: {total_running_time} seconds\n")
+            file.write(f"Total number of variables: {num_variables}\n")
+            file.write(f"Total number of constraints: {num_constraints}\n")
 
             for var in model.getVars():
                 if var.Xn > 0:
