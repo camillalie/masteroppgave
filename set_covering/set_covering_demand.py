@@ -7,8 +7,6 @@ import gurobipy as gp
 
 sheet_dictionaries = {}
 
-# prøve å få inn endringer!!
-
 
 mappenavn = 'generated_datafiles_setcover70_capacity'
 outputnavn = 'setcover70_capacity'
