@@ -11,7 +11,6 @@ sheet_dictionaries = {}
 mappenavn = 'generated_datafiles_setcover70_capacity'
 outputnavn = 'setcover70_capacity'
 
-# for å oppdatere git
 
 def set_covering_model():
     model = gp.Model()
