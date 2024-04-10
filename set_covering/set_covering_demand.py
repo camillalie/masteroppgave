@@ -9,8 +9,8 @@ sheet_dictionaries = {}
 
 
 
-mappenavn = 'generated_datafiles_2239'
-outputnavn = '2239'
+mappenavn = 'generated_datafiles_setcover70_capacity'
+outputnavn = 'setcover70_capacity'
 
 
 
