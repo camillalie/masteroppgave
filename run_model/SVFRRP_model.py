@@ -210,7 +210,10 @@ def SVFRRP_model(sets, params):
         for t in T1:
             xst = gp.quicksum(psv1_s_a_t[s, a, t] for a in A)
             model.addConstr(
-                bigMdelta * delta1_s_t[s, t] >= xst, name=f'system_per_tp_{s}_{t}'
+            delta1_s_t[s, t] <= bigMdelta * (1 - xst), name=f'delta_zero_{s}_{t}_ub'
+            )
+            model.addConstr(
+                delta1_s_t[s, t] <= xst, name=f'delta_zero_{s}_{t}_lb'
             )
 
     # # Fuel - system Compatibility constraint
@@ -565,8 +568,12 @@ def SVFRRP_model(sets, params):
         for s in S:
             for t in T2:
                 xst = gp.quicksum(psv2_s_a_t_w[s, a, t, w] for a in A)
+            
                 model.addConstr(
                     bigMdelta * delta2_s_t_w[s, t, w] >= xst, name=f'system_per_tp2_{s}_{t}_{w}'
+                )
+                model.addConstr(
+                    delta2_s_t_w[s, t, w] <= xst, name=f'delta_zero_{s}_{t}_{w}_lb'
                 )
                 
                 
@@ -826,7 +833,7 @@ model, T = SVFRRP_model(sets, parameters)
 model.setParam('MIPGap', 0.001)# 0.001)
 
 # Set the TimeLimit to 10 hours (36000 seconds)
-model.setParam('TimeLimit', 10800)
+model.setParam('TimeLimit', 36000) #10800)
 model.optimize() 
 end_time = time.time()  # Record the end time
 total_running_time = end_time - start_time  # Calculate the total running time
