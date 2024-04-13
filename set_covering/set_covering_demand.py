@@ -8,8 +8,10 @@ import gurobipy as gp
 sheet_dictionaries = {}
 
 
-mappenavn = 'generated_datafiles_setcover70_capacity'
-outputnavn = 'setcover70_capacity'
+mappenavn = '25'
+sluttfilnavn = ''
+
+outputfil = f'../route_generation_mongstad/{mappenavn}/output_setcovering_{sluttfilnavn}.csv'
 
 
 def set_covering_model():
@@ -21,7 +23,7 @@ def set_covering_model():
     mj_route_dict = {}
     demand_dict = {}
 
-    df_platform = pd.read_csv('../route_generation_mongstad/clustering/output_platforms_demand.csv', delimiter=';')
+    df_platform = pd.read_csv(f'../route_generation_mongstad/{mappenavn}/output_platforms_visits.csv', delimiter=';')
     # List of platforms with corresponding numbers
     # platforms = [
     #     "GFAGFBGFC", "APT", "STASTB", "ASL", "DAB", "OSE", 
@@ -35,21 +37,21 @@ def set_covering_model():
         platform_to_number[platform] = idx
 
     # Read the CSV files and populate the dictionaries
-    with open(f'../route_generation_mongstad/{mappenavn}/routes.csv', 'r') as file:
+    with open(f'../route_generation_mongstad/{mappenavn}/routes{sluttfilnavn}.csv', 'r') as file:
         reader = csv.reader(file)
         for row_number, row in enumerate(reader, 1):
             platform_numbers = [platform_to_number[platform] for platform in row if platform !=  "MON" ] # endre til MON
             routes_dict[row_number] = platform_numbers
             
 
-    with open(f'../route_generation_mongstad/{mappenavn}/mj_route.csv', 'r') as file:
+    with open(f'../route_generation_mongstad/{mappenavn}/mj_route{sluttfilnavn}.csv', 'r') as file:
         reader = csv.reader(file)
         next(reader)
         for row_number, row in enumerate(reader, 1):
             value = float(row[0])
             mj_route_dict[row_number] = value
     
-    with open(f'../route_generation_mongstad/{mappenavn}/demand.csv', 'r') as file:
+    with open(f'../route_generation_mongstad/{mappenavn}/demand{sluttfilnavn}.csv', 'r') as file:
         reader = csv.reader(file)
         next(reader)
         for row_number, row in enumerate(reader, 1):
@@ -59,7 +61,7 @@ def set_covering_model():
     #print('demand dict: ', demand_dict)
 
 
-    platform_visits_path = '../route_generation_mongstad/clustering/output_platforms_visits.csv'
+    platform_visits_path = f'../route_generation_mongstad/{mappenavn}/output_platforms_visits.csv'
     df = pd.read_csv(platform_visits_path, delimiter=';')
 
     # Create a dictionary from the DataFrame
@@ -101,7 +103,7 @@ def set_covering_model():
 
 
 def write_output_file(sailed_routes):
-    with open(f'output_routes_{outputnavn}.csv', 'w', newline='') as file:
+    with open(outputfil, 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Route Number', 'Sailed'])
         
