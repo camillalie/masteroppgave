@@ -87,7 +87,7 @@ def SVFRRP_model(sets, params):
     new_psv1_s_t = model.addVars(indices_newpsv_1, vtype=gp.GRB.INTEGER, lb=0, name="new_psv1_s_t")                          # y^N
     scrap_psv1_s_a_t = model.addVars(indices_scrap_1, vtype=gp.GRB.INTEGER, lb=0, name="scrap_psv1_s_a_t")                   # y^S
     weekly_routes1_s_a_f_r_t = model.addVars(S, A,F_s, R_s, T1, vtype=gp.GRB.INTEGER, name="weekly_routes1_s_a_f_r_t")       #z^T
-    delta1_s_t = model.addVars(S,T1, vtype=gp.GRB.BINARY, lb=0, name="delta1_s_t")
+    # delta1_s_t = model.addVars(S,T1, vtype=gp.GRB.BINARY, lb=0, name="delta1_s_t")
 
     # stage 2 variables
     psv2_s_a_t_w = model.addVars(S, A, T2, O, vtype=gp.GRB.INTEGER, lb=0, name="psv2_s_a_t_w")                                   # x
@@ -95,7 +95,7 @@ def SVFRRP_model(sets, params):
     new_psv2_s_t_w = model.addVars(indices_newpsv_2, vtype=gp.GRB.INTEGER, lb=0, name="new_psv2_s_t_w")                            # y^N
     scrap_psv2_s_a_t_w = model.addVars(indices_scrap_2, vtype=gp.GRB.INTEGER, lb=0, name="scrap_psv2_s_a_t_w")                   # y^S
     weekly_routes2_s_a_f_r_t_w = model.addVars(S, A,F_s, R_s, T2, O, vtype=gp.GRB.INTEGER, name="weekly_routes2_s_a_f_r_t_w")            #z^T
-    delta2_s_t_w = model.addVars(S,T2, O, vtype=gp.GRB.BINARY, lb=0, name="delta2_s_t_w")
+    # delta2_s_t_w = model.addVars(S,T2, O, vtype=gp.GRB.BINARY, lb=0, name="delta2_s_t_w")
 
     model.update()
     
@@ -206,15 +206,15 @@ def SVFRRP_model(sets, params):
 
 
     # BESTEMME SYSTEM I HVER TIDSPERIODE
-    for s in S:
-        for t in T1:
-            xst = gp.quicksum(psv1_s_a_t[s, a, t] for a in A)
-            model.addConstr(
-            delta1_s_t[s, t] <= bigMdelta * (1 - xst), name=f'delta_zero_{s}_{t}_ub'
-            )
-            model.addConstr(
-                delta1_s_t[s, t] <= xst, name=f'delta_zero_{s}_{t}_lb'
-            )
+    # for s in S:
+    #     for t in T1:
+    #         xst = gp.quicksum(psv1_s_a_t[s, a, t] for a in A)
+    #         model.addConstr(
+    #         delta1_s_t[s, t] <= bigMdelta * (1 - xst), name=f'delta_zero_{s}_{t}_ub'
+    #         )
+    #         model.addConstr(
+    #             delta1_s_t[s, t] <= xst, name=f'delta_zero_{s}_{t}_lb'
+    #         )
 
     # # Fuel - system Compatibility constraint
     # Fuel - system Compatibility constraint
@@ -564,17 +564,17 @@ def SVFRRP_model(sets, params):
     #####################
 
      # BESTEMME SYSTEM I HVER TIDSPERIODE
-    for w in O:
-        for s in S:
-            for t in T2:
-                xst = gp.quicksum(psv2_s_a_t_w[s, a, t, w] for a in A)
+    # for w in O:
+    #     for s in S:
+    #         for t in T2:
+    #             xst = gp.quicksum(psv2_s_a_t_w[s, a, t, w] for a in A)
             
-                model.addConstr(
-                    bigMdelta * delta2_s_t_w[s, t, w] >= xst, name=f'system_per_tp2_{s}_{t}_{w}'
-                )
-                model.addConstr(
-                    delta2_s_t_w[s, t, w] <= xst, name=f'delta_zero_{s}_{t}_{w}_lb'
-                )
+    #             model.addConstr(
+    #                 bigMdelta * delta2_s_t_w[s, t, w] >= xst, name=f'system_per_tp2_{s}_{t}_{w}'
+    #             )
+    #             model.addConstr(
+    #                 delta2_s_t_w[s, t, w] <= xst, name=f'delta_zero_{s}_{t}_{w}_lb'
+    #             )
                 
                 
     # Fuel - system Compatibility constraint
@@ -833,7 +833,7 @@ model, T = SVFRRP_model(sets, parameters)
 model.setParam('MIPGap', 0.001)# 0.001)
 
 # Set the TimeLimit to 10 hours (36000 seconds)
-model.setParam('TimeLimit', 36000) #10800)
+model.setParam('TimeLimit', 10800)
 model.optimize() 
 end_time = time.time()  # Record the end time
 total_running_time = end_time - start_time  # Calculate the total running time
