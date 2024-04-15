@@ -8,7 +8,7 @@ import gurobipy as gp
 sheet_dictionaries = {}
 
 
-mappenavn = '25'
+mappenavn = 'config3/25'
 sluttfilnavn = ''
 
 outputfil = f'../route_generation_mongstad/{mappenavn}/output_setcovering_{sluttfilnavn}.csv'
