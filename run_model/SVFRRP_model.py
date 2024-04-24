@@ -199,9 +199,9 @@ def SVFRRP_model(sets, params):
                     for f in F_s:
                         for r in R_s:
                             if t == 1:
-                                fuel_cost_acc += weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t * fuel_cost2[f, t, w] * factor *0.4 *distance[r]
+                                fuel_cost_acc += weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t * fuel_cost2[f, t, w] * factor * 0.4 * distance[r]
                             else:
-                                fuel_cost_acc += weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t * fuel_cost2[f, t, w] / eac**(5*(t-1)) *factor*distance[r]
+                                fuel_cost_acc += weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t * fuel_cost2[f, t, w] / eac**(5*(t-1)) * factor * distance[r]
             
             fuel_cost_per_t_s2[t, w] = fuel_cost_acc
 
@@ -215,8 +215,8 @@ def SVFRRP_model(sets, params):
 
 
     total_cost_s1 = gp.quicksum(total_cost_per_t_s1[t] for t in T1) + gp.quicksum(fuel_cost_per_t_s1[t] for t in T1) + gp.quicksum(acquiring_cost_per_t_s1[t] for t in T1)
-    total_cost_s2 = gp.quicksum(retro_cost_per_t_s2[t,w] for t in T2 for w in O) + gp.quicksum(scrap_cost_t2[t,w] for t in T2scrap for w in O) + gp.quicksum(fuel_cost_per_t_s2[t,w] for t in T2 for w in O) + gp.quicksum(acquiring_cost_per_t_s2[t,w] for t in T2 for w in O)
-    total_cost = total_cost_s1 + total_cost_s2 
+    total_cost_s2 = gp.quicksum(retro_cost_per_t_s2[t,w] for t in T2 for w in O) + gp.quicksum(scrap_cost_t2[t,w] for t in T2scrap for w in O) + gp.quicksum(fuel_cost_per_t_s2[t,w] * probability[w] for t in T2 for w in O) + gp.quicksum(acquiring_cost_per_t_s2[t,w] for t in T2 for w in O)
+    total_cost = total_cost_s1 + total_cost_s2
 
     model.setObjective(total_cost, sense=gp.GRB.MINIMIZE)
     model.update()
@@ -845,10 +845,10 @@ print('Line before start running model ')
 start_time = time.time()
 model, T = SVFRRP_model(sets, parameters)
 # Set the MIPGap to 1% (0.01)
-model.setParam('MIPGap', 0.001)# 0.001)
+model.setParam('MIPGap', 0.1)# 0.001)
 
 # Set the TimeLimit to 10 hours (36000 seconds)
-#model.setParam('TimeLimit', 36000)
+model.setParam('TimeLimit', 36000)
 model.optimize() 
 end_time = time.time()  # Record the end time
 total_running_time = end_time - start_time  # Calculate the total running time
