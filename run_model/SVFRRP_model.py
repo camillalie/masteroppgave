@@ -17,6 +17,7 @@ print('Parameter values loaded')
 file_sets = 'SetData-sheets.xlsx' # "data_generation/SetData-sheets.xlsx"
 sets = get_sets(file_sets)
 print('Sets values loaded')
+# hei
 
 
 
@@ -65,17 +66,20 @@ def SVFRRP_model(sets, params):
     eac = 1.05
     emission_factor = 1.08
     probability = params['Probability']  # P_w
-    not_buy_new = [9, 10]
+    not_buy_new = [9, 10, 12, 13]
     distance = params['Distance']
     bigMdelta = 10
+    mgoEm_to_b30 = 0.736
     
     
 
 
     # Indices for variables
-    indices_retro = [(1, 9, a, t) for a in A for t in T1] + [(2, 10, a, t) for a in A for t in T1]  
+    indices_retro = [(1, 9, a, t) for a in A for t in T1] + [(2, 10, a, t) for a in A for t in T1]  + [(1, 12, a, t) for a in A for t in T1] + [(2, 13, a, t) for a in A for t in T1]
     indices_retro2 = [(1, 9, a, t) for a in A 
-                      for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(2, 10, a, t) for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1]
+                      for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(2, 10, a, t) 
+                                                                           for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(2, 13, a, t) 
+                                                                                                                                                         for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(1, 12, a, t) for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1]
     indices_scrap_1 = [(s, a, t) for s in S for a in A if (a!=0) for t in T1] 
     indices_scrap_2 = [(s, a, t, w) for s in S for a in A if (a!=0) for t in T2scrap for w in O]
     indices_newpsv_1 = [(s, t) for s in S if (s not in not_buy_new) for t in T1]
@@ -104,18 +108,16 @@ def SVFRRP_model(sets, params):
     ##############
 
     branching_priorities = {
-    "psv1_s_a_t": 2,
-    "psv2_s_a_t_w": 2,
-    "retro_psv1_s_s_a_t": 3,
-    "retro_psv2_s_s_a_t_w": 3,
-    "new_psv1_s_t": 4, 
-    "new_psv2_s_t_w": 4,
-    "scrap_psv1_s_a_t":5, 
-    "scrap_psv2_s_a_t_w": 5,
-    "weekly_routes1_s_a_f_r_t": 6,
-    "weekly_routes2_s_a_f_r_t_w": 6,
-    "delta1_s_t": 1, 
-    "delta2_s_t_w": 1
+    "psv1_s_a_t": 1,
+    "psv2_s_a_t_w": 1,
+    "retro_psv1_s_s_a_t": 2,
+    "retro_psv2_s_s_a_t_w": 2,
+    "new_psv1_s_t": 3, 
+    "new_psv2_s_t_w": 3,
+    "scrap_psv1_s_a_t":4, 
+    "scrap_psv2_s_a_t_w": 4,
+    "weekly_routes1_s_a_f_r_t": 5,
+    "weekly_routes2_s_a_f_r_t_w": 5,
     }
 
     # Add more variables and priorities as needed
@@ -149,12 +151,22 @@ def SVFRRP_model(sets, params):
         ) for t in T1
     }
 
-    fuel_cost_per_t_s1 = {
-        t: gp.quicksum(
-            (fuel_cost1[f, r] * 0.4 if t == 1 else fuel_cost1[f, r])/eac**(5*(t-1)) * weekly_routes1_s_a_f_r_t[s,a,f,r,t] * week_to_t
-            for s in S for a in A for f in F_s for r in R_s
-            ) for t in T1
-    }
+  
+    fuel_cost_per_t_s1 = {}
+    for t in T1:
+        fuel_cost_acc = 0
+        for s in S:
+            factor = 1.2 if s == 12 or s == 13 else 1
+            for a in A: 
+                for f in F_s:
+                    for r in R_s:
+                        if t == 1:
+                            fuel_cost_acc += weekly_routes1_s_a_f_r_t[s,a,f,r,t] * week_to_t * fuel_cost1[f,r]*factor *0.4
+                        else: 
+                            fuel_cost_acc += weekly_routes1_s_a_f_r_t[s,a,f,r,t] * week_to_t * fuel_cost1[f,r]*factor 
+
+        fuel_cost_per_t_s1[t] = fuel_cost_acc
+
 
 
 
@@ -174,13 +186,24 @@ def SVFRRP_model(sets, params):
         )for t in T2 for w in O
     }
 
-    fuel_cost_per_t_s2 = {
-        (t,w): (probability[w] * (gp.quicksum(
-                    (fuel_cost2[f, t, w]) / eac**(5*(t-1)) * weekly_routes2_s_a_f_r_t_w[s,a,f,r,t, w] * week_to_t * distance[r]
-                    for s in S for a in A for f in F_s for r in R_s
-                ) )
-        ) for t in T2 for w in O
-    }
+    fuel_cost_per_t_s2 = {}
+
+    for t in T2:
+        for w in O:
+            fuel_cost_acc = 0
+            
+            for s in S:
+                factor = 1.2 if s == 12 or s == 13 else 1
+                
+                for a in A: 
+                    for f in F_s:
+                        for r in R_s:
+                            if t == 1:
+                                fuel_cost_acc += weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t * fuel_cost2[f, t, w] * factor * 0.4 * distance[r]
+                            else:
+                                fuel_cost_acc += weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t * fuel_cost2[f, t, w] / eac**(5*(t-1)) * factor * distance[r]
+            
+            fuel_cost_per_t_s2[t, w] = fuel_cost_acc
 
     scrap_cost_t2 = {
         (t, w): probability[w] * gp.quicksum( -
@@ -192,8 +215,8 @@ def SVFRRP_model(sets, params):
 
 
     total_cost_s1 = gp.quicksum(total_cost_per_t_s1[t] for t in T1) + gp.quicksum(fuel_cost_per_t_s1[t] for t in T1) + gp.quicksum(acquiring_cost_per_t_s1[t] for t in T1)
-    total_cost_s2 = gp.quicksum(retro_cost_per_t_s2[t,w] for t in T2 for w in O) + gp.quicksum(scrap_cost_t2[t,w] for t in T2scrap for w in O) + gp.quicksum(fuel_cost_per_t_s2[t,w] for t in T2 for w in O) + gp.quicksum(acquiring_cost_per_t_s2[t,w] for t in T2 for w in O)
-    total_cost = total_cost_s1 + total_cost_s2 
+    total_cost_s2 = gp.quicksum(retro_cost_per_t_s2[t,w] for t in T2 for w in O) + gp.quicksum(scrap_cost_t2[t,w] for t in T2scrap for w in O) + gp.quicksum(fuel_cost_per_t_s2[t,w] * probability[w] for t in T2 for w in O) + gp.quicksum(acquiring_cost_per_t_s2[t,w] for t in T2 for w in O)
+    total_cost = total_cost_s1 + total_cost_s2
 
     model.setObjective(total_cost, sense=gp.GRB.MINIMIZE)
     model.update()
@@ -417,15 +440,11 @@ def SVFRRP_model(sets, params):
                 for f in F_s:
                     for r in R_s:
                         if f == 1 or f == 2: 
-                            if s == 5 or s == 6 or s == 7 or s == 8: # 80% utslipp på mindre båter
-                                total_emissions.add(emissions[f, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t * 0.8)
-                            else: 
-                                total_emissions.add(emissions[f, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t)
+                            total_emissions.add(emissions[s, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t)
+                        elif f == 5:
+                            total_emissions.add(emissions[s, r]* mgoEm_to_b30 * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t/ emission_factor**t)
                         else: # forgrønningsfaktor på grønne fuels
-                            if s == 5 or s == 6 or s == 7 or s == 8 or s == 9: # 80% utslipp på mindre båter
-                                total_emissions.add(emissions[f, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t/ emission_factor**t * 0.8)
-                            else: 
-                                total_emissions.add(emissions[f, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t/ emission_factor**t)
+                            total_emissions.add(emissions[s, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t/ emission_factor**t)
                            
         model.addConstr(
             total_emissions <= max_em_period[t],
@@ -744,16 +763,12 @@ def SVFRRP_model(sets, params):
                     for a in A:
                         for f in F_s:
                             for r in R_s:
-                                if f == 1 or f == 2: 
-                                    if s == 5 or s == 6 or s == 7 or s == 8: # 80% utslipp på mindre båter
-                                        total_emissions.add(emissions[f, r] * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t * 0.8)
-                                    else: 
-                                        total_emissions.add(emissions[f, r] * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t)
+                                if f == 1 or f == 2:  
+                                    total_emissions.add(emissions[s, r] * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t)
+                                elif f == 5:
+                                    total_emissions.add(emissions[s, r] * mgoEm_to_b30 * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t/ emission_factor**t)
                                 else: # forgrønningsfaktor på grønne fuels
-                                    if s == 5 or s == 6 or s == 7 or s == 8: # 80% utslipp på mindre båter
-                                        total_emissions.add(emissions[f, r] * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t/ emission_factor**t * 0.8)
-                                    else: 
-                                        total_emissions.add(emissions[f, r] * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t/ emission_factor**t)
+                                    total_emissions.add(emissions[s, r] * weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t/ emission_factor**t)
                     
                 
                 model.addConstr(
@@ -830,10 +845,10 @@ print('Line before start running model ')
 start_time = time.time()
 model, T = SVFRRP_model(sets, parameters)
 # Set the MIPGap to 1% (0.01)
-model.setParam('MIPGap', 0.001)# 0.001)
+model.setParam('MIPGap', 0.1)# 0.001)
 
 # Set the TimeLimit to 10 hours (36000 seconds)
-model.setParam('TimeLimit', 10800)
+model.setParam('TimeLimit', 36000)
 model.optimize() 
 end_time = time.time()  # Record the end time
 total_running_time = end_time - start_time  # Calculate the total running time
