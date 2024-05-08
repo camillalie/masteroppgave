@@ -9,10 +9,10 @@ cargo_capacity_psv = 100
 psv_speed = 10
 max_platforms_in_one_voyage = 7
 
-mappenavn = 'generated_datafiles_allroutes'
+mappenavn = 'generated_datafiles_allroutes_16'
 
-demand = pd.read_csv('clustering/output_platforms_demand.csv', header=0, delimiter=';')
-distances = pd.read_csv('clustering/output_distance_matrix_kmeans.csv', header=0, delimiter=';', index_col='from/to')
+demand = pd.read_csv(f'{mappenavn}/output_platforms_demand.csv', header=0, delimiter=';')
+distances = pd.read_csv(f'{mappenavn}/output_distance_matrix_kmeans.csv', header=0, delimiter=';', index_col='from/to')
 
 platforms_demand = dict(zip(demand['platform'], demand['avg_q'].replace(',', '.').astype(float)))
 platforms_d = ['MON'] + demand['platform'].tolist() + ['MON']  # Add 'DUS' as start and end platforms
