@@ -9,7 +9,7 @@ cargo_capacity_psv = 100
 psv_speed = 10
 max_platforms_in_one_voyage = 7
 
-mappenavn = 'cluster13_new'
+mappenavn = 'cluster12_new'
 
 demand = pd.read_csv(f'{mappenavn}/output_platforms_demand.csv', header=0, delimiter=';')
 distances = pd.read_csv(f'{mappenavn}/output_distance_matrix_kmeans.csv', header=0, delimiter=';', index_col='from/to')
