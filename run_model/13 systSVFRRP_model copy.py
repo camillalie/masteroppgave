@@ -66,7 +66,7 @@ def SVFRRP_model(sets, params):
     eac = 1.05
     emission_factor = 1.08
     probability = params['Probability']  # P_w
-    not_buy_new = [4,5,7,8]
+    not_buy_new = [9, 10, 12, 13]
     distance = params['Distance']
     bigMdelta = 10
     mgoEm_to_b30 = 0.736
@@ -75,11 +75,11 @@ def SVFRRP_model(sets, params):
 
 
     # Indices for variables
-    indices_retro = [(1, 4, a, t) for a in A for t in T1] + [(2, 5, a, t) for a in A for t in T1]  + [(1, 7, a, t) for a in A for t in T1] + [(2, 8, a, t) for a in A for t in T1]
-    indices_retro2 = [(1, 4, a, t) for a in A 
-                      for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(2, 5, a, t) 
-                                                                           for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(2, 8, a, t) 
-                                                                                                                                                         for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(1, 7, a, t) for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1]
+    indices_retro = [(1, 9, a, t) for a in A for t in T1] + [(2, 10, a, t) for a in A for t in T1]  + [(1, 12, a, t) for a in A for t in T1] + [(2, 13, a, t) for a in A for t in T1]
+    indices_retro2 = [(1, 9, a, t) for a in A 
+                      for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(2, 10, a, t) 
+                                                                           for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(2, 13, a, t) 
+                                                                                                                                                         for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(1, 12, a, t) for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1]
     indices_scrap_1 = [(s, a, t) for s in S for a in A if (a!=0) for t in T1] 
     indices_scrap_2 = [(s, a, t, w) for s in S for a in A if (a!=0) for t in T2 for w in O]
     indices_newpsv_1 = [(s, t) for s in S if (s not in not_buy_new) for t in T1]
@@ -107,28 +107,28 @@ def SVFRRP_model(sets, params):
     # Branching priority
     ##############
 
-    # branching_priorities = {
-    # "psv1_s_a_t": 5,
-    # "psv2_s_a_t_w": 5,
-    # "retro_psv1_s_s_a_t": 2, #2
-    # "retro_psv2_s_s_a_t_w": 4, #4
-    # "new_psv1_s_t": 1,  #1
-    # "new_psv2_s_t_w": 3, #3
-    # "scrap_psv1_s_a_t":10,  # Fiksert når vi sier at den må skrapes ved alder fem
-    # "scrap_psv2_s_a_t_w": 10, # fiksert når vi sier at det må skrapes ved alder fem
-    # "weekly_routes1_s_a_f_r_t": 6,
-    # "weekly_routes2_s_a_f_r_t_w": 6,
-    # }
+    branching_priorities = {
+    "psv1_s_a_t": 1,
+    "psv2_s_a_t_w": 1,
+    "retro_psv1_s_s_a_t": 2,
+    "retro_psv2_s_s_a_t_w": 2,
+    "new_psv1_s_t": 3, 
+    "new_psv2_s_t_w": 3,
+    "scrap_psv1_s_a_t":4, 
+    "scrap_psv2_s_a_t_w": 4,
+    "weekly_routes1_s_a_f_r_t": 5,
+    "weekly_routes2_s_a_f_r_t_w": 5,
+    }
 
-    # # Add more variables and priorities as needed
+    # Add more variables and priorities as needed
 
-    # # Set branching priorities using the dictionary
-    # for v in model.getVars():
-    #     var_name = v.VarName.split('[')[0]  # Extracting variable name without indices
-    #     if var_name in branching_priorities:
-    #         v.setAttr(gp.GRB.Attr.BranchPriority, branching_priorities[var_name])
-    #     else:
-    #         print(f"Variable {var_name} not found in the model.")
+    # Set branching priorities using the dictionary
+    for v in model.getVars():
+        var_name = v.VarName.split('[')[0]  # Extracting variable name without indices
+        if var_name in branching_priorities:
+            v.setAttr(gp.GRB.Attr.BranchPriority, branching_priorities[var_name])
+        else:
+            print(f"Variable {var_name} not found in the model.")
 
 
 
@@ -156,7 +156,7 @@ def SVFRRP_model(sets, params):
     for t in T1:
         fuel_cost_acc = 0
         for s in S:
-            factor = 1.2 if s == 7 or s == 8 else 1
+            factor = 1.2 if s == 12 or s == 13 else 1
             for a in A: 
                 for f in F_s:
                     for r in R_s:
@@ -193,7 +193,7 @@ def SVFRRP_model(sets, params):
             fuel_cost_acc = 0
             
             for s in S:
-                factor = 1.2 if s == 7 or s == 8 else 1
+                factor = 1.2 if s == 12 or s == 13 else 1
                 
                 for a in A: 
                     for f in F_s:
@@ -241,15 +241,6 @@ def SVFRRP_model(sets, params):
 
     # # Fuel - system Compatibility constraint
     # Fuel - system Compatibility constraint
-
-
-    for t in T1: 
-        for a in A:
-            for s in S:
-                if a != 5:
-                    if (s,a,t) in scrap_psv1_s_a_t:
-                        model.addConstr(scrap_psv1_s_a_t[s,a,t] == 0, name=f'fixedscrapage{s}_{a}_{t}')
-
 
     for t in T1:
         for r in R_s:
@@ -604,15 +595,7 @@ def SVFRRP_model(sets, params):
     #                 delta2_s_t_w[s, t, w] <= xst, name=f'delta_zero_{s}_{t}_{w}_lb'
     #             )
                 
-    for w in O:
-        for t in T2: 
-            for a in A:
-                for s in S:
-                    if a != 5:
-                        if (s,a,t,w) in scrap_psv2_s_a_t_w:
-                            model.addConstr(scrap_psv2_s_a_t_w[s,a,t,w] == 0, name=f'fixedscrapage{s}_{a}_{t}_{w}')
-
-
+                
     # Fuel - system Compatibility constraint
 
     for t in T2:
@@ -865,7 +848,7 @@ model, T = SVFRRP_model(sets, parameters)
 model.setParam('MIPGap', 0.001)# 0.001)
 
 # Set the TimeLimit to 10 hours (36000 seconds)
-model.setParam('TimeLimit',  36000) # 36000) # 86400)
+model.setParam('TimeLimit', 36000) # 86400)
 model.optimize() 
 end_time = time.time()  # Record the end time
 total_running_time = end_time - start_time  # Calculate the total running time
