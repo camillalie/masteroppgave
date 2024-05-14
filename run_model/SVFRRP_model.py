@@ -22,6 +22,8 @@ print('Sets values loaded')
 
 
 total_emissions_per_t = {}
+total_operational_costs = {}
+total_investment_costs = {}
 
 def SVFRRP_model(sets, params):
     """
@@ -103,33 +105,6 @@ def SVFRRP_model(sets, params):
 
     model.update()
     
-    ##############
-    # Branching priority
-    ##############
-
-    # branching_priorities = {
-    # "psv1_s_a_t": 5,
-    # "psv2_s_a_t_w": 5,
-    # "retro_psv1_s_s_a_t": 2, #2
-    # "retro_psv2_s_s_a_t_w": 4, #4
-    # "new_psv1_s_t": 1,  #1
-    # "new_psv2_s_t_w": 3, #3
-    # "scrap_psv1_s_a_t":10,  # Fiksert når vi sier at den må skrapes ved alder fem
-    # "scrap_psv2_s_a_t_w": 10, # fiksert når vi sier at det må skrapes ved alder fem
-    # "weekly_routes1_s_a_f_r_t": 6,
-    # "weekly_routes2_s_a_f_r_t_w": 6,
-    # }
-
-    # # Add more variables and priorities as needed
-
-    # # Set branching priorities using the dictionary
-    # for v in model.getVars():
-    #     var_name = v.VarName.split('[')[0]  # Extracting variable name without indices
-    #     if var_name in branching_priorities:
-    #         v.setAttr(gp.GRB.Attr.BranchPriority, branching_priorities[var_name])
-    #     else:
-    #         print(f"Variable {var_name} not found in the model.")
-
 
 
     ###############
@@ -151,6 +126,9 @@ def SVFRRP_model(sets, params):
         ) for t in T1
     }
 
+    for t in T1:
+        total_investment_costs[t] = total_cost_per_t_s1[t] + acquiring_cost_per_t_s1[t]
+
   
     fuel_cost_per_t_s1 = {}
     for t in T1:
@@ -166,6 +144,7 @@ def SVFRRP_model(sets, params):
                             fuel_cost_acc += weekly_routes1_s_a_f_r_t[s,a,f,r,t] * week_to_t * fuel_cost1[f,r]*factor 
 
         fuel_cost_per_t_s1[t] = fuel_cost_acc
+        total_operational_costs[t] = fuel_cost_acc
 
 
 
@@ -189,6 +168,7 @@ def SVFRRP_model(sets, params):
     fuel_cost_per_t_s2 = {}
 
     for t in T2:
+        total_cost_tw =0
         for w in O:
             fuel_cost_acc = 0
             
@@ -203,7 +183,10 @@ def SVFRRP_model(sets, params):
                             else:
                                 fuel_cost_acc += weekly_routes2_s_a_f_r_t_w[s, a, f, r, t, w] * week_to_t * fuel_cost2[f, t, w] / eac**(5*(t-1)) * factor * distance[r]
             
-            fuel_cost_per_t_s2[t, w] = fuel_cost_acc
+            fuel_cost_per_t_s2[t, w] = fuel_cost_acc 
+            total_cost_tw += probability[w]*fuel_cost_acc
+        
+        total_operational_costs[t] = total_cost_tw
 
     scrap_cost_t2 = {
         (t, w): probability[w] * gp.quicksum( -
@@ -211,6 +194,14 @@ def SVFRRP_model(sets, params):
                     for s in S for a in A if (s,a,t,w) in scrap_psv2_s_a_t_w)
         for t in T2scrap for w in O
     }
+
+    for t in T2:
+        tot_t_cost = 0
+        for w in O:
+            tot_t_cost += acquiring_cost_per_t_s2[t,w] + retro_cost_per_t_s2[t,w] - scrap_cost_t2[t,w]
+        
+        
+        total_investment_costs[t] = tot_t_cost
 
 
 
@@ -220,6 +211,40 @@ def SVFRRP_model(sets, params):
 
     model.setObjective(total_cost, sense=gp.GRB.MINIMIZE)
     model.update()
+
+    #####################
+    # VSS RESTRIKSJON
+    #####################
+
+    # for t in T1:
+    #     if t == 0:
+    #         for s1 in S:
+    #             for a in A:
+    #                 for s2 in S:
+    #                     if (s1, s2, a, t) in retro_psv1_s_s_a_t:
+    #                         model.addConstr(retro_psv1_s_s_a_t[s1, s2, a, t] == 0, name=f'vssconst1_{s1}_{s2}_{a}_{t}')
+    #                 if (s1, a, t) in scrap_psv1_s_a_t:
+    #                     model.addConstr(scrap_psv1_s_a_t[s1, a, t] == 0, name=f'vssconst3_{s1}_{a}_{t}')
+    #                 if (s1, t) in new_psv1_s_t:
+    #                     model.addConstr(new_psv1_s_t[s1, t] == 0, name=f'vssconst2_{s1}_{t}')
+    #     else:
+    #         retrofit = 0
+    #         for s1 in S:
+    #             for a in A:
+    #                 for s2 in S:
+    #                     if (s1, s2, a, t) in retro_psv1_s_s_a_t:
+    #                         if s1 == 2 and s2 == 8:
+    #                             retrofit += retro_psv1_s_s_a_t[s1, s2, a, t]
+    #                 if (s1, t) in new_psv1_s_t:
+    #                     model.addConstr(new_psv1_s_t[s1, t] == 0, name=f'vssconst2_{s1}_{t}')
+    #                 if (s1, a, t) in scrap_psv1_s_a_t:
+    #                     model.addConstr(scrap_psv1_s_a_t[s1, a, t] == 0, name=f'vssconst2_{s1}_{a}_{t}')
+    #         model.addConstr(retrofit >= 1, name=f'vssconst4_{s1}_{s2}_{a}_{t}')
+    # model.update()
+
+
+    
+
 
 
     
@@ -603,6 +628,7 @@ def SVFRRP_model(sets, params):
     #             model.addConstr(
     #                 delta2_s_t_w[s, t, w] <= xst, name=f'delta_zero_{s}_{t}_{w}_lb'
     #             )
+
                 
     for w in O:
         for t in T2: 
@@ -891,6 +917,10 @@ if model.status == gp.GRB.OPTIMAL:
 
     for t in T:
         print(f"Total Emissions for time period {t}: {total_emissions_per_t[t].getValue()}")
+    for t in T:
+        print(f"Total operational costs for time period {t}: {total_operational_costs[t].getValue()}")
+    for t in T:
+        print(f"Total investment costs for time period {t}: {total_investment_costs[t].getValue()}")
     optimality_gap = model.getAttr('MIPGap')
     print(f"Optimality Gap: {optimality_gap * 100}%")   
     
@@ -910,7 +940,13 @@ if model.status == gp.GRB.OPTIMAL:
                 file.write(f"{var.varName} = {var.Xn}\n")
         for t in T:
                  file.write(f"Total Emissions for time period {t}: {total_emissions_per_t[t].getValue()}\n")
-#  
+        for t in T:
+                 file.write(f"Total fuel costs for time period {t}: {total_operational_costs[t].getValue()}\n")
+        for t in T:
+                 file.write(f"Total investment costs for time period {t}: {total_investment_costs[t].getValue()}\n")
+
+            
+  
             
 elif model.status == gp.GRB.TIME_LIMIT:
     optimality_gap = model.getAttr('MIPGap')
