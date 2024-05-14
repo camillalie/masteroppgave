@@ -71,7 +71,7 @@ def SVFRRP_model(sets, params):
     distance = params['Distance']
     bigMdelta = 10
     mgoEm_to_b30 = 0.736
-    max_emissions_total = 29000#384754
+    max_emissions_total = 197784
     
     
 
@@ -254,9 +254,9 @@ def SVFRRP_model(sets, params):
                         if f == 1 or f == 2: 
                             emissions_t1[t] += emissions[s, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t
                         elif f == 5:
-                            emissions_t1[t]+=emissions[s, r]* mgoEm_to_b30 * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t/ emission_factor**t
+                            emissions_t1[t] += emissions[s, r]* mgoEm_to_b30 * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t/ emission_factor**t
                         else: # forgrønningsfaktor på grønne fuels
-                            emissions_t1[t]+=emissions[s, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t/ emission_factor**t
+                            emissions_t1[t] += emissions[s, r] * weekly_routes1_s_a_f_r_t[s, a, f, r, t] * week_to_t/ emission_factor**t
                            
    
         
