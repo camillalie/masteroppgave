@@ -7,7 +7,7 @@ import numpy as np
 import time
 
 # Get parameter values
-file_parameters = 'Parameterdata.xlsx'
+file_parameters = 'Parameterdata-2.xlsx'
 
 parameters = get_parameters(file_parameters)
 
@@ -19,7 +19,7 @@ sets = get_sets(file_sets)
 print('Sets values loaded')
 # hei
 
-
+#print(parameters)
 
 total_emissions_per_t = {}
 total_operational_costs = {}
@@ -48,8 +48,10 @@ def SVFRRP_model(sets, params):
     # T0 = {0,0}
 
     # Parameters
-    retro_cost = params['Cost of retrofitting']                   # C^R
-    aquiring_cost = params['Cost of newbuilding']             # C^N
+    retro_cost1 = params['Cost of retrofitting 1']                  # C^R
+    retro_cost2 = params['Cost of retrofitting 2']                  # C^R
+    aquiring_cost1 = params['Cost of newbuilding 1']             # C^N
+    aquiring_cost2 = params['Cost of newbuilding 2']
     selling_revenue = params['Revenue']         # R^S
     fuel_cost1 = params['Cost of fuel 1']                     # C^F_fr
     fuel_cost2 = params['Cost of fuel 2']              # C^F_frw
@@ -78,10 +80,10 @@ def SVFRRP_model(sets, params):
 
     # Indices for variables
     indices_retro = [(1, 4, a, t) for a in A for t in T1] + [(2, 5, a, t) for a in A for t in T1]  + [(1, 7, a, t) for a in A for t in T1] + [(2, 8, a, t) for a in A for t in T1]
-    indices_retro2 = [(1, 4, a, t) for a in A 
-                      for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(2, 5, a, t) 
-                                                                           for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(2, 8, a, t) 
-                                                                                                                                                         for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(1, 7, a, t) for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1]
+    indices_retro2 = [(1, 4, a, t, w) for a in A for w in O
+                      for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(2, 5, a, t, w) for w in O
+                                                                           for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(2, 8, a, t, w) for w in O
+                                                                                                                                                        for a in A for idx, t in enumerate(T2) if idx < len(T2) - 1] + [(1, 7, a, t, w) for a in A for w in O for idx, t in enumerate(T2) if idx < len(T2) - 1]
     indices_scrap_1 = [(s, a, t) for s in S for a in A if (a!=0) for t in T1] 
     indices_scrap_2 = [(s, a, t, w) for s in S for a in A if (a!=0) for t in T2 for w in O]
     indices_newpsv_1 = [(s, t) for s in S if (s not in not_buy_new) for t in T1]
@@ -97,7 +99,7 @@ def SVFRRP_model(sets, params):
 
     # stage 2 variables
     psv2_s_a_t_w = model.addVars(S, A, T2, O, vtype=gp.GRB.INTEGER, lb=0, name="psv2_s_a_t_w")                                   # x
-    retro_psv2_s_s_a_t_w = model.addVars(indices_retro, vtype=gp.GRB.INTEGER, lb=0, name="retro_psv2_s_s_a_t_w")              # y^r
+    retro_psv2_s_s_a_t_w = model.addVars(indices_retro2, vtype=gp.GRB.INTEGER, lb=0, name="retro_psv2_s_s_a_t_w")              # y^r
     new_psv2_s_t_w = model.addVars(indices_newpsv_2, vtype=gp.GRB.INTEGER, lb=0, name="new_psv2_s_t_w")                            # y^N
     scrap_psv2_s_a_t_w = model.addVars(indices_scrap_2, vtype=gp.GRB.INTEGER, lb=0, name="scrap_psv2_s_a_t_w")                   # y^S
     weekly_routes2_s_a_f_r_t_w = model.addVars(S, A,F_s, R_s, T2, O, vtype=gp.GRB.INTEGER, name="weekly_routes2_s_a_f_r_t_w")            #z^T
@@ -113,7 +115,7 @@ def SVFRRP_model(sets, params):
 
     total_cost_per_t_s1 = {
         t: gp.quicksum(
-            retro_cost[s, s1] * retro_psv1_s_s_a_t[s, s1, a, t]/eac**(5*(t-1))
+            retro_cost1[s, s1] * retro_psv1_s_s_a_t[s, s1, a, t]/eac**(5*(t-1))
             for s in S for a in A for s1 in S if (s, s1, a, t) in retro_psv1_s_s_a_t
         ) - gp.quicksum(
             selling_revenue[s, a] * scrap_psv1_s_a_t[s, a, t]/eac**(5*(t-1)) for s in S for a in A if (s,a,t) in scrap_psv1_s_a_t
@@ -122,7 +124,7 @@ def SVFRRP_model(sets, params):
 
     acquiring_cost_per_t_s1 = {
         t: gp.quicksum(
-            aquiring_cost[s] * new_psv1_s_t[s, t]/eac**(5*(t-1)) for s in S if (s,t) in new_psv1_s_t
+            aquiring_cost1[s] * new_psv1_s_t[s, t]/eac**(5*(t-1)) for s in S if (s,t) in new_psv1_s_t
         ) for t in T1
     }
 
@@ -152,7 +154,7 @@ def SVFRRP_model(sets, params):
     
     retro_cost_per_t_s2 = {
         (t, w): (probability[w] * (gp.quicksum(
-                    retro_cost[s, s1] * retro_psv2_s_s_a_t_w[s, s1, a, t, w] / eac**(5*(t-1))
+                    retro_cost2[s, s1, w] * retro_psv2_s_s_a_t_w[s, s1, a, t, w] / eac**(5*(t-1))
                     for s in S for a in A for s1 in S if (s, s1, a, t, w) in retro_psv2_s_s_a_t_w
                 ) 
         )
@@ -160,7 +162,7 @@ def SVFRRP_model(sets, params):
     }
     acquiring_cost_per_t_s2 = {
         (t,w): (probability[w] * gp.quicksum(
-                    aquiring_cost[s] * new_psv2_s_t_w[s, t, w] / eac**(5*(t-1)) for s in S if (s,t,w) in new_psv2_s_t_w
+                    aquiring_cost2[s,w] * new_psv2_s_t_w[s, t, w] / eac**(5*(t-1)) for s in S if (s,t,w) in new_psv2_s_t_w
                 ) 
         )for t in T2 for w in O
     }
@@ -266,8 +268,11 @@ def SVFRRP_model(sets, params):
                     for s2 in S:
                         if (s1, s2, a, t) in retro_psv1_s_s_a_t:
                             model.addConstr(retro_psv1_s_s_a_t[s1, s2, a, t] == 0, name=f'vssconst6_{s1}_{t}')
-                    if (s1, t) in new_psv1_s_t:
-                        model.addConstr(new_psv1_s_t[s1, t] == 0, name=f'vssconst2_{s1}_{t}')
+                    if s1 == 1 and t==1:
+                        model.addConstr(new_psv1_s_t[s1, t] == 1, name=f'vssconst3_{s1}_{t}')
+                    elif s1 !=1:
+                        if (s1,t) in new_psv1_s_t:
+                            model.addConstr(new_psv1_s_t[s1, t] == 0, name=f'vssconst2_{s1}_{t}')
                     if (s1, a, t) in scrap_psv1_s_a_t:
                         model.addConstr(scrap_psv1_s_a_t[s1, a, t] == 0, name=f'vssconst2_{s1}_{a}_{t}')
             #model.addConstr(retrofit >= 1, name=f'vssconst4_{s1}_{s2}_{a}_{t}')
@@ -913,12 +918,11 @@ def SVFRRP_model(sets, params):
     return model, T
 
 print('Line before start running model ')
-total_emissions = 0
+
 start_time = time.time()
 model, T = SVFRRP_model(sets, parameters)
 # Set the MIPGap to 1% (0.01)
 model.setParam('MIPGap', 0.001)# 0.001)
-
 
 # Set the TimeLimit to 10 hours (36000 seconds)
 model.setParam('TimeLimit',  36000) # 36000) # 86400)
@@ -929,7 +933,7 @@ max_em_param = parameters['Max Emissions']
 num_variables = len(model.getVars())
 num_constraints = len(model.getConstrs())
 
-outputfilepath = '_output.txt'
+outputfilepath = 'output_invest.txt'
 
 
 
@@ -944,9 +948,6 @@ if model.status == gp.GRB.OPTIMAL:
     # for var in model.getVars():
     #     if var.x > 0:
     #         print(f"{var.varName} = {var.x}")
-    for t in T: 
-        total_emissions += total_emissions_per_t[t].getValue()
-    
 
     for t in T:
         print(f"Total Emissions for time period {t}: {total_emissions_per_t[t].getValue()}")
@@ -956,7 +957,6 @@ if model.status == gp.GRB.OPTIMAL:
         print(f"Total investment costs for time period {t}: {total_investment_costs[t].getValue()}")
     optimality_gap = model.getAttr('MIPGap')
     print(f"Optimality Gap: {optimality_gap * 100}%")   
-    print(f"Total emissions: {total_emissions}\n")
     
     with open(outputfilepath, mode='a', newline='') as file:
         # Write header
@@ -968,8 +968,7 @@ if model.status == gp.GRB.OPTIMAL:
         file.write(f"Total Running Time: {total_running_time} seconds\n")
         file.write(f"Total number of variables: {num_variables}\n")
         file.write(f"Total number of constraints: {num_constraints}\n")
-        file.write(f"Total emissions: {total_emissions}\n")
-
+        
         for var in model.getVars():
             if var.Xn > 0:
                 file.write(f"{var.varName} = {var.Xn}\n")
@@ -992,15 +991,11 @@ elif model.status == gp.GRB.TIME_LIMIT:
             file.write('MaxEmissions: ')
             # Write the value
             file.write(f"{max_em_param}\n")
-
             file.write(f"Objective Value: {model.objVal}\n")
             file.write(f"Optimality Gap: {optimality_gap * 100}%\n")
             file.write(f"Total Running Time: {total_running_time} seconds\n")
             file.write(f"Total number of variables: {num_variables}\n")
             file.write(f"Total number of constraints: {num_constraints}\n")
-            for t in T: 
-                total_emissions += total_emissions_per_t[t].getValue()
-            file.write(f"Total emissions: {total_emissions}\n")
 
             for var in model.getVars():
                 if var.Xn > 0:
@@ -1013,7 +1008,15 @@ elif model.status == gp.GRB.TIME_LIMIT:
 #             # for t in T1:
 #             #     file.write(f"{t}, {total_cost_per_t_s1[t].getValue()}\n")
 
+            for t in T:
+                 file.write(f"Total fuel costs for time period {t}: {total_operational_costs[t].getValue()}\n")
+            for t in T:
+                 file.write(f"Total investment costs for time period {t}: {total_investment_costs[t].getValue()}\n")
 
 
 else:
     print("No optimal solution found.")
+    with open(outputfilepath, mode='a', newline='') as file:
+        for var in model.getVars():
+                if var.Xn > 0:
+                    file.write(f"{var.varName} = {var.Xn}\n")

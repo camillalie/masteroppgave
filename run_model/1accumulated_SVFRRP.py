@@ -19,7 +19,7 @@ sets = get_sets(file_sets)
 print('Sets values loaded')
 # hei
 
-
+outputfilepath = '_acc.txt'
 
 total_emissions_per_t = {}
 total_overall_emissions = {}
@@ -71,7 +71,7 @@ def SVFRRP_model(sets, params):
     distance = params['Distance']
     bigMdelta = 10
     mgoEm_to_b30 = 0.736
-    max_emissions_total = 197784
+    max_emissions_total = 329790
     
     
 
@@ -290,6 +290,34 @@ def SVFRRP_model(sets, params):
                 tot_emissions <= max_emissions_total,
                 name=f"total_emissions_constraint_{w}"
             )
+    model.update()
+
+
+    for t in T1:
+        if t == 1:
+            retrofitted_psv = gp.LinExpr()
+            for s1 in S:
+                for a in A:
+                    for s2 in S:
+                        if (s1, s2, a, t) in retro_psv1_s_s_a_t:
+                            retrofitted_psv += retro_psv1_s_s_a_t[s1, s2, a, t]
+                    if (s1, a, t) in scrap_psv1_s_a_t:
+                        model.addConstr(scrap_psv1_s_a_t[s1, a, t] == 0, name=f'vssconst3_{s1}_{a}_{t}')
+                    if (s1, t) in new_psv1_s_t:
+                        model.addConstr(new_psv1_s_t[s1, t] == 0, name=f'vssconst2_{s1}_{t}')
+            model.addConstr(retrofitted_psv >= 1, name=f'vssconst6_{t}')
+        else:
+            # retrofit = 0
+            for s1 in S:
+                for a in A:
+                    for s2 in S:
+                        if (s1, s2, a, t) in retro_psv1_s_s_a_t:
+                            model.addConstr(retro_psv1_s_s_a_t[s1, s2, a, t] == 0, name=f'vssconst6_{s1}_{t}')
+                    if (s1, t) in new_psv1_s_t:
+                        model.addConstr(new_psv1_s_t[s1, t] == 0, name=f'vssconst2_{s1}_{t}')
+                    if (s1, a, t) in scrap_psv1_s_a_t:
+                        model.addConstr(scrap_psv1_s_a_t[s1, a, t] == 0, name=f'vssconst2_{s1}_{a}_{t}')       
+            #model.addConstr(retrofit >= 1, name=f'vssconst4_{s1}_{s2}_{a}_{t}')
     model.update()
 
     
@@ -928,7 +956,6 @@ max_em_param = parameters['Max Emissions']
 num_variables = len(model.getVars())
 num_constraints = len(model.getConstrs())
 
-outputfilepath = 'output_file.txt'
 
 
 

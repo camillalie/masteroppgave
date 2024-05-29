@@ -913,12 +913,11 @@ def SVFRRP_model(sets, params):
     return model, T
 
 print('Line before start running model ')
-total_emissions = 0
+
 start_time = time.time()
 model, T = SVFRRP_model(sets, parameters)
 # Set the MIPGap to 1% (0.01)
 model.setParam('MIPGap', 0.001)# 0.001)
-
 
 # Set the TimeLimit to 10 hours (36000 seconds)
 model.setParam('TimeLimit',  36000) # 36000) # 86400)
@@ -929,7 +928,7 @@ max_em_param = parameters['Max Emissions']
 num_variables = len(model.getVars())
 num_constraints = len(model.getConstrs())
 
-outputfilepath = '_output.txt'
+outputfilepath = 'eev.txt'
 
 
 
@@ -944,9 +943,6 @@ if model.status == gp.GRB.OPTIMAL:
     # for var in model.getVars():
     #     if var.x > 0:
     #         print(f"{var.varName} = {var.x}")
-    for t in T: 
-        total_emissions += total_emissions_per_t[t].getValue()
-    
 
     for t in T:
         print(f"Total Emissions for time period {t}: {total_emissions_per_t[t].getValue()}")
@@ -956,7 +952,6 @@ if model.status == gp.GRB.OPTIMAL:
         print(f"Total investment costs for time period {t}: {total_investment_costs[t].getValue()}")
     optimality_gap = model.getAttr('MIPGap')
     print(f"Optimality Gap: {optimality_gap * 100}%")   
-    print(f"Total emissions: {total_emissions}\n")
     
     with open(outputfilepath, mode='a', newline='') as file:
         # Write header
@@ -968,8 +963,7 @@ if model.status == gp.GRB.OPTIMAL:
         file.write(f"Total Running Time: {total_running_time} seconds\n")
         file.write(f"Total number of variables: {num_variables}\n")
         file.write(f"Total number of constraints: {num_constraints}\n")
-        file.write(f"Total emissions: {total_emissions}\n")
-
+        
         for var in model.getVars():
             if var.Xn > 0:
                 file.write(f"{var.varName} = {var.Xn}\n")
@@ -992,15 +986,11 @@ elif model.status == gp.GRB.TIME_LIMIT:
             file.write('MaxEmissions: ')
             # Write the value
             file.write(f"{max_em_param}\n")
-
             file.write(f"Objective Value: {model.objVal}\n")
             file.write(f"Optimality Gap: {optimality_gap * 100}%\n")
             file.write(f"Total Running Time: {total_running_time} seconds\n")
             file.write(f"Total number of variables: {num_variables}\n")
             file.write(f"Total number of constraints: {num_constraints}\n")
-            for t in T: 
-                total_emissions += total_emissions_per_t[t].getValue()
-            file.write(f"Total emissions: {total_emissions}\n")
 
             for var in model.getVars():
                 if var.Xn > 0:
@@ -1017,3 +1007,7 @@ elif model.status == gp.GRB.TIME_LIMIT:
 
 else:
     print("No optimal solution found.")
+    with open(outputfilepath, mode='a', newline='') as file:
+        for var in model.getVars():
+                if var.Xn > 0:
+                    file.write(f"{var.varName} = {var.Xn}\n")
